@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct EPUBReaderApp: App {
+struct DulcineaApp: App {  // Changed from EPUBReaderApp to DulcineaApp
     @StateObject private var appCoordinator = AppCoordinator()
     
     var body: some Scene {

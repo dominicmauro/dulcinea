@@ -31,22 +31,41 @@ class EPUBService: ObservableObject {
     }
     
     private func parseEPUBFile(at url: URL) throws -> EPUBContent {
-        // Create temporary directory for extraction
+        // Create unique temporary directory for extraction
         let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent("epub_\(UUID().uuidString)")
+        
+        // Ensure the directory doesn't exist and create it
+        try? FileManager.default.removeItem(at: tempDir)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         
         defer {
             try? FileManager.default.removeItem(at: tempDir)
         }
         
         // Extract EPUB (it's a ZIP file)
-        let archive = try Archive(url: url, accessMode: .read)
-        for entry in archive {
-            _ = try archive.extract(entry, to: tempDir)
+        do {
+            let archive = try Archive(url: url, accessMode: .read)
+            for entry in archive {
+                let destinationURL = tempDir.appendingPathComponent(entry.path)
+                
+                // Create intermediate directories if needed
+                let parentDir = destinationURL.deletingLastPathComponent()
+                try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
+                
+                // Extract the entry
+                _ = try archive.extract(entry, to: destinationURL.deletingLastPathComponent())
+            }
+        } catch {
+            throw EPUBError.extractionFailed
         }
         
         // Parse container.xml to find OPF file
         let containerPath = tempDir.appendingPathComponent("META-INF/container.xml")
+        guard FileManager.default.fileExists(atPath: containerPath.path) else {
+            throw EPUBError.invalidContainer
+        }
+        
         let opfPath = try parseContainer(at: containerPath, baseURL: tempDir)
         
         // Parse OPF file for metadata and manifest
@@ -200,40 +219,60 @@ class EPUBService: ObservableObject {
     
     // MARK: - Cover Image Extraction
     
+    // In EPUBService.swift, replace the extractCoverImage method with this fixed version:
+
     func extractCoverImage(from filePath: String) async throws -> Data? {
         let fileURL = URL(fileURLWithPath: filePath)
         let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent("cover_\(UUID().uuidString)")
+        
+        // Ensure clean temporary directory
+        try? FileManager.default.removeItem(at: tempDir)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
         
         defer {
             try? FileManager.default.removeItem(at: tempDir)
         }
         
-        // Extract EPUB
-        let archive = try Archive(url: fileURL, accessMode: .read)
-        for entry in archive {
-            _ = try archive.extract(entry, to: tempDir)
+        do {
+            // Extract EPUB
+            let archive = try Archive(url: fileURL, accessMode: .read)
+            for entry in archive {
+                let destinationURL = tempDir.appendingPathComponent(entry.path)
+                let parentDir = destinationURL.deletingLastPathComponent()
+                try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
+                _ = try archive.extract(entry, to: parentDir)
+            }
+            
+            // Parse container and OPF to find cover
+            let containerPath = tempDir.appendingPathComponent("META-INF/container.xml")
+            guard FileManager.default.fileExists(atPath: containerPath.path) else {
+                return nil
+            }
+            
+            let opfPath = try parseContainer(at: containerPath, baseURL: tempDir)
+            let (_, manifest, _) = try parseOPF(at: opfPath)
+            
+            // Look for cover image in manifest
+            let coverItem = manifest.values.first { item in
+                item.properties?.contains("cover-image") == true ||
+                item.id == "cover" ||
+                item.id == "cover-image" ||
+                item.id.lowercased().contains("cover")
+            }
+            
+            guard let coverItem = coverItem else { return nil }
+            
+            let coverURL = opfPath.deletingLastPathComponent().appendingPathComponent(coverItem.href)
+            
+            guard FileManager.default.fileExists(atPath: coverURL.path) else { return nil }
+            
+            return try Data(contentsOf: coverURL)
+            
+        } catch {
+            print("Error extracting cover image: \(error)")
+            return nil
         }
-        
-        // Parse container and OPF to find cover
-        let containerPath = tempDir.appendingPathComponent("META-INF/container.xml")
-        let opfPath = try parseContainer(at: containerPath, baseURL: tempDir)
-        let (_, manifest, _) = try parseOPF(at: opfPath)
-        
-        // Look for cover image in manifest
-        let coverItem = manifest.values.first { item in
-            item.properties?.contains("cover-image") == true ||
-            item.id == "cover" ||
-            item.id == "cover-image"
-        }
-        
-        guard let coverItem = coverItem else { return nil }
-        
-        let coverURL = opfPath.deletingLastPathComponent().appendingPathComponent(coverItem.href)
-        
-        guard FileManager.default.fileExists(atPath: coverURL.path) else { return nil }
-        
-        return try Data(contentsOf: coverURL)
     }
     
     // MARK: - Book Creation Helper
