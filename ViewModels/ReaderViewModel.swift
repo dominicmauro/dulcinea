@@ -115,7 +115,7 @@ class ReaderViewModel: ObservableObject {
     func updatePosition(_ position: Double) {
         currentPosition = max(0.0, min(1.0, position))
         updateReadingProgress()
-        
+
         // Debounced progress saving
         progressSaveTask?.cancel()
         progressSaveTask = Task {
@@ -123,7 +123,8 @@ class ReaderViewModel: ObservableObject {
             if !Task.isCancelled {
                 saveProgress()
             }
-        }    }
+        }
+    }
     
     
     private func updateReadingProgress() {

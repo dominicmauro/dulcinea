@@ -68,7 +68,8 @@ struct SettingsView: View {
                 
                 Spacer()
                 
-                if viewModel.syncConfiguration != nil {                    VStack(alignment: .trailing, spacing: 2) {
+                if viewModel.syncConfiguration != nil {
+                    VStack(alignment: .trailing, spacing: 2) {
                         Text("Configured")
                             .font(.caption)
                             .foregroundColor(.green)
@@ -280,7 +281,8 @@ struct SyncConfigurationSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                if viewModel.syncConfiguration != nil {                    configuredSection
+                if viewModel.syncConfiguration != nil {
+                    configuredSection
                 } else {
                     setupSection
                 }
@@ -472,7 +474,7 @@ struct ReadingDefaultsView: View {
                     }
                     
                     Text("Sample text at \(Int(viewModel.defaultReadingSettings.fontSize))pt")
-                        .font(.custom(viewModel.defaultReadingSettings.fontFamily.fontName, size: viewModel.defaultReadingSettings.fontSize))
+                        .font(viewModel.defaultReadingSettings.fontFamily == .systemDefault ? .system(size: viewModel.defaultReadingSettings.fontSize) : .custom(viewModel.defaultReadingSettings.fontFamily.fontName, size: viewModel.defaultReadingSettings.fontSize))
                         .foregroundColor(.secondary)
                 }
                 

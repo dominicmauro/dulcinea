@@ -94,13 +94,13 @@ struct ReaderView: View {
                 let currentChapter = viewModel.chapters[viewModel.currentChapter]
                 
                 Text(currentChapter.title)
-                    .font(.custom(viewModel.fontFamily.fontName, size: viewModel.fontSize + 4))
+                    .font(viewModel.fontFamily == .systemDefault ? .system(size: viewModel.fontSize + 4) : .custom(viewModel.fontFamily.fontName, size: viewModel.fontSize + 4))
                     .fontWeight(.semibold)
                     .foregroundColor(Color(hex: viewModel.backgroundColor.color.text))
                     .padding(.bottom, 20)
-                
+
                 Text(currentChapter.content)
-                    .font(.custom(viewModel.fontFamily.fontName, size: viewModel.fontSize))
+                    .font(viewModel.fontFamily == .systemDefault ? .system(size: viewModel.fontSize) : .custom(viewModel.fontFamily.fontName, size: viewModel.fontSize))
                     .lineSpacing(viewModel.lineSpacing * viewModel.fontSize * 0.2)
                     .foregroundColor(Color(hex: viewModel.backgroundColor.color.text))
                     .textSelection(.enabled)
@@ -349,7 +349,7 @@ struct ReaderView: View {
             }
             
             Text("Sample text at \(Int(viewModel.fontSize))pt")
-                .font(.custom(viewModel.fontFamily.fontName, size: viewModel.fontSize))
+                .font(viewModel.fontFamily == .systemDefault ? .system(size: viewModel.fontSize) : .custom(viewModel.fontFamily.fontName, size: viewModel.fontSize))
                 .foregroundColor(.secondary)
         }
     }
@@ -367,7 +367,7 @@ struct ReaderView: View {
                     }) {
                         VStack {
                             Text("Aa")
-                                .font(.custom(font.fontName, size: 20))
+                                .font(font == .systemDefault ? .system(size: 20) : .custom(font.fontName, size: 20))
                                 .foregroundColor(viewModel.fontFamily == font ? .white : .primary)
                             
                             Text(font.displayName)
