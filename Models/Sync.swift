@@ -41,7 +41,7 @@ struct SyncConfiguration: Codable {
     let deviceId: String
     let syncInterval: TimeInterval // in seconds
     let autoSync: Bool
-    
+
     init(serverURL: String, username: String, password: String, deviceName: String = UIDevice.current.name) {
         self.serverURL = serverURL
         self.username = username
@@ -50,6 +50,21 @@ struct SyncConfiguration: Codable {
         self.deviceId = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
         self.syncInterval = 300 // 5 minutes default
         self.autoSync = true
+    }
+}
+
+/// Non-sensitive sync settings stored in UserDefaults
+struct SyncSettings: Codable {
+    let deviceName: String
+    let deviceId: String
+    let syncInterval: TimeInterval
+    let autoSync: Bool
+
+    init(deviceName: String = UIDevice.current.name, syncInterval: TimeInterval = 300, autoSync: Bool = true) {
+        self.deviceName = deviceName
+        self.deviceId = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
+        self.syncInterval = syncInterval
+        self.autoSync = autoSync
     }
 }
 
@@ -67,7 +82,8 @@ enum SyncError: Error, LocalizedError {
     case invalidResponse
     case bookNotFound
     case configurationMissing
-    
+    case invalidServerURL
+
     var errorDescription: String? {
         switch self {
         case .networkError(let error):
@@ -82,6 +98,8 @@ enum SyncError: Error, LocalizedError {
             return "Book not found on sync server."
         case .configurationMissing:
             return "Sync configuration is missing or incomplete."
+        case .invalidServerURL:
+            return "Invalid server URL. Please check the URL format."
         }
     }
 }

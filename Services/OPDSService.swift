@@ -26,11 +26,14 @@ class OPDSService: ObservableObject {
         request.setValue("application/atom+xml", forHTTPHeaderField: "Accept")
         
         // Add authentication if required
-        if let catalog = catalog, catalog.requiresAuthentication {
-            let credentials = "\(catalog.username!):\(catalog.password!)"
-            let credentialsData = credentials.data(using: .utf8)!
-            let base64Credentials = credentialsData.base64EncodedString()
-            request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+        if let catalog = catalog, catalog.requiresAuthentication,
+           let username = catalog.username,
+           let password = catalog.password {
+            let credentials = "\(username):\(password)"
+            if let credentialsData = credentials.data(using: .utf8) {
+                let base64Credentials = credentialsData.base64EncodedString()
+                request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+            }
         }
         
         let (data, response) = try await urlSession.data(for: request)
@@ -104,11 +107,14 @@ class OPDSService: ObservableObject {
         var request = URLRequest(url: downloadURL)
         
         // Add authentication if required
-        if let catalog = catalog, catalog.requiresAuthentication {
-            let credentials = "\(catalog.username!):\(catalog.password!)"
-            let credentialsData = credentials.data(using: .utf8)!
-            let base64Credentials = credentialsData.base64EncodedString()
-            request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+        if let catalog = catalog, catalog.requiresAuthentication,
+           let username = catalog.username,
+           let password = catalog.password {
+            let credentials = "\(username):\(password)"
+            if let credentialsData = credentials.data(using: .utf8) {
+                let base64Credentials = credentialsData.base64EncodedString()
+                request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+            }
         }
         
         return try await withCheckedThrowingContinuation { continuation in
