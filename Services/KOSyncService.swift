@@ -24,6 +24,31 @@ class KOSyncService: ObservableObject {
         config.timeoutIntervalForResource = 60
         self.urlSession = URLSession(configuration: config)
     }
+
+    deinit {
+        // Clean up auto-sync timer to prevent memory leaks
+        syncTimer?.invalidate()
+        syncTimer = nil
+    }
+
+    // MARK: - Helper Methods
+
+    /// Create a Basic Authentication header value from credentials
+    private func createAuthHeader(username: String, password: String) -> String? {
+        let credentials = "\(username):\(password)"
+        guard let credentialsData = credentials.data(using: .utf8) else {
+            return nil
+        }
+        return "Basic \(credentialsData.base64EncodedString())"
+    }
+
+    /// Add authentication header to a request
+    private func addAuthHeader(to request: inout URLRequest, config: SyncConfiguration) throws {
+        guard let authHeader = createAuthHeader(username: config.username, password: config.password) else {
+            throw SyncError.authenticationFailed
+        }
+        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+    }
     
     // MARK: - Configuration
     
@@ -48,7 +73,9 @@ class KOSyncService: ObservableObject {
     // MARK: - Connection Testing
     
     func testConnection(with config: SyncConfiguration) async throws {
-        let testURL = URL(string: "\(config.serverURL)/users/auth")!
+        guard let testURL = URL(string: "\(config.serverURL)/users/auth") else {
+            throw SyncError.invalidServerURL
+        }
         var request = URLRequest(url: testURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -119,17 +146,16 @@ class KOSyncService: ObservableObject {
     }
     
     private func uploadSyncProgress(_ progress: SyncProgress, config: SyncConfiguration) async throws {
-        let url = URL(string: "\(config.serverURL)/syncs/progress")!
+        guard let url = URL(string: "\(config.serverURL)/syncs/progress") else {
+            throw SyncError.invalidServerURL
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         // Add authentication
-        let credentials = "\(config.username):\(config.password)"
-        let credentialsData = credentials.data(using: .utf8)!
-        let base64Credentials = credentialsData.base64EncodedString()
-        request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
-        
+        try addAuthHeader(to: &request, config: config)
+
         // Prepare request body
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .secondsSince1970
@@ -165,23 +191,22 @@ class KOSyncService: ObservableObject {
         guard let config = configuration else {
             throw SyncError.configurationMissing
         }
-        
-        let url = URL(string: "\(config.serverURL)/syncs/progress/\(book.identifier)")!
+
+        guard let url = URL(string: "\(config.serverURL)/syncs/progress/\(book.identifier.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? book.identifier)") else {
+            throw SyncError.invalidServerURL
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        
+
         // Add authentication
-        let credentials = "\(config.username):\(config.password)"
-        let credentialsData = credentials.data(using: .utf8)!
-        let base64Credentials = credentialsData.base64EncodedString()
-        request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
-        
+        try addAuthHeader(to: &request, config: config)
+
         let (data, response) = try await urlSession.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SyncError.invalidResponse
         }
-        
+
         switch httpResponse.statusCode {
         case 200:
             let decoder = JSONDecoder()
@@ -196,7 +221,7 @@ class KOSyncService: ObservableObject {
             throw SyncError.serverError("HTTP \(httpResponse.statusCode)")
         }
     }
-    
+
     // MARK: - Bulk Sync
     
     func syncAllBooks(_ books: [Book]) async throws {
@@ -311,51 +336,49 @@ class KOSyncService: ObservableObject {
         guard let config = configuration else {
             throw SyncError.configurationMissing
         }
-        
-        let url = URL(string: "\(config.serverURL)/devices")!
+
+        guard let url = URL(string: "\(config.serverURL)/devices") else {
+            throw SyncError.invalidServerURL
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         // Add authentication
-        let credentials = "\(config.username):\(config.password)"
-        let credentialsData = credentials.data(using: .utf8)!
-        let base64Credentials = credentialsData.base64EncodedString()
-        request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
-        
+        try addAuthHeader(to: &request, config: config)
+
         let deviceInfo = [
             "device_id": config.deviceId,
             "device_name": config.deviceName,
             "device_type": "iOS",
             "app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         ]
-        
+
         request.httpBody = try JSONSerialization.data(withJSONObject: deviceInfo)
-        
+
         let (_, response) = try await urlSession.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse,
               200...299 ~= httpResponse.statusCode else {
             throw SyncError.serverError("Failed to register device")
         }
     }
-    
+
     // MARK: - Statistics
-    
+
     func getReadingStatistics() async throws -> ReadingStatistics? {
         guard let config = configuration else {
             throw SyncError.configurationMissing
         }
-        
-        let url = URL(string: "\(config.serverURL)/users/\(config.username)/stats")!
+
+        guard let url = URL(string: "\(config.serverURL)/users/\(config.username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? config.username)/stats") else {
+            throw SyncError.invalidServerURL
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        
+
         // Add authentication
-        let credentials = "\(config.username):\(config.password)"
-        let credentialsData = credentials.data(using: .utf8)!
-        let base64Credentials = credentialsData.base64EncodedString()
-        request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
+        try addAuthHeader(to: &request, config: config)
         
         let (data, response) = try await urlSession.data(for: request)
         

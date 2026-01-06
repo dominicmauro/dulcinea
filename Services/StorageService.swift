@@ -6,16 +6,17 @@ class StorageService: ObservableObject {
     private let booksDirectory: URL
     private let coversDirectory: URL
     private let userDefaults = UserDefaults.standard
-    
+    private let keychainService = KeychainService()
+
     // Published properties
     @Published var books: [Book] = []
     @Published var catalogs: [OPDSCatalog] = []
-    
+
     // UserDefaults keys
     private enum Keys {
         static let books = "stored_books"
         static let catalogs = "opds_catalogs"
-        static let syncConfiguration = "sync_configuration"
+        static let syncSettings = "sync_settings"
     }
     
     init() {
@@ -157,22 +158,76 @@ class StorageService: ObservableObject {
     }
     
     // MARK: - Sync Configuration
-    
+
+    /// Save sync configuration with credentials stored securely in Keychain
     func saveSyncConfiguration(_ config: SyncConfiguration) {
-        if let encoded = try? JSONEncoder().encode(config) {
-            userDefaults.set(encoded, forKey: Keys.syncConfiguration)
+        // Store sensitive credentials in Keychain
+        do {
+            try keychainService.saveSyncCredentials(
+                serverURL: config.serverURL,
+                username: config.username,
+                password: config.password
+            )
+        } catch {
+            print("Failed to save sync credentials to Keychain: \(error)")
+            return
+        }
+
+        // Store non-sensitive settings in UserDefaults
+        let settings = SyncSettings(
+            deviceName: config.deviceName,
+            syncInterval: config.syncInterval,
+            autoSync: config.autoSync
+        )
+        if let encoded = try? JSONEncoder().encode(settings) {
+            userDefaults.set(encoded, forKey: Keys.syncSettings)
         }
     }
-    
+
+    /// Load sync configuration by combining Keychain credentials with UserDefaults settings
     func loadSyncConfiguration() -> SyncConfiguration? {
-        guard let data = userDefaults.data(forKey: Keys.syncConfiguration),
-              let config = try? JSONDecoder().decode(SyncConfiguration.self, from: data) else {
+        // Load credentials from Keychain
+        guard let credentials = keychainService.loadSyncCredentials() else {
             return nil
         }
-        return config
+
+        // Load settings from UserDefaults
+        let settings: SyncSettings
+        if let data = userDefaults.data(forKey: Keys.syncSettings),
+           let decoded = try? JSONDecoder().decode(SyncSettings.self, from: data) {
+            settings = decoded
+        } else {
+            settings = SyncSettings()
+        }
+
+        return SyncConfiguration(
+            serverURL: credentials.serverURL,
+            username: credentials.username,
+            password: credentials.password,
+            deviceName: settings.deviceName
+        )
     }
-    
+
+    /// Remove sync configuration from both Keychain and UserDefaults
     func removeSyncConfiguration() {
-        userDefaults.removeObject(forKey: Keys.syncConfiguration)
+        keychainService.deleteSyncCredentials()
+        userDefaults.removeObject(forKey: Keys.syncSettings)
+    }
+
+    // MARK: - OPDS Catalog Credentials
+
+    /// Save credentials for an OPDS catalog securely
+    func saveOPDSCatalogCredentials(catalogId: UUID, username: String, password: String) {
+        try? keychainService.saveOPDSCredentials(catalogId: catalogId, username: username, password: password)
+    }
+
+    /// Load credentials for an OPDS catalog
+    func loadOPDSCatalogCredentials(for catalogId: UUID) -> (username: String, password: String)? {
+        return keychainService.loadOPDSCredentials(for: catalogId)
+    }
+
+    /// Delete credentials for an OPDS catalog
+    func deleteOPDSCatalogCredentials(for catalogId: UUID) {
+        keychainService.deleteOPDSCredentials(for: catalogId)
     }
 }

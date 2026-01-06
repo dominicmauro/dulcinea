@@ -33,9 +33,17 @@ class ReaderViewModel: ObservableObject {
     init(epubService: EPUBService, syncService: KOSyncService) {
         self.epubService = epubService
         self.syncService = syncService
-        
+
         loadReadingSettings()
         setupProgressTracking()
+    }
+
+    deinit {
+        // Clean up timers to prevent memory leaks
+        progressTimer?.invalidate()
+        progressTimer = nil
+        progressSaveTask?.cancel()
+        progressSaveTask = nil
     }
     
     // MARK: - Book Loading
