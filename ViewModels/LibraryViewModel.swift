@@ -7,15 +7,17 @@ class LibraryViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var syncStatus: SyncStatus = .notConfigured
     @Published var errorMessage: String?
-    
+
     private let storageService: StorageService
+    private let epubService: EPUBService
     private let syncService: KOSyncService
     private var cancellables = Set<AnyCancellable>()
-    
-    init(storageService: StorageService, syncService: KOSyncService) {
+
+    init(storageService: StorageService, epubService: EPUBService, syncService: KOSyncService) {
         self.storageService = storageService
+        self.epubService = epubService
         self.syncService = syncService
-        
+
         setupBindings()
         loadBooks()
     }
@@ -154,31 +156,15 @@ class LibraryViewModel: ObservableObject {
             throw ImportError.accessDenied
         }
         defer { url.stopAccessingSecurityScopedResource() }
-        
+
         // Read file data
         let data = try Data(contentsOf: url)
-        let filename = url.lastPathComponent
-        
-        // Save to local storage
-        let localURL = try storageService.saveEPUBFile(data, filename: filename)
-        
-        // Extract metadata (this would be handled by EPUBService in real implementation)
-        let book = Book(
-            title: extractTitle(from: filename),
-            author: "Unknown Author", // Would be extracted from EPUB metadata
-            identifier: UUID().uuidString,
-            filePath: localURL.path,
-            fileSize: Int64(data.count)
-        )
-        
+
+        // Use EPUBService to create book with proper metadata extraction
+        // This extracts title, author, identifier from EPUB metadata and cover image
+        let book = try await epubService.createBookFromEPUB(at: url, data: data)
+
         storageService.addBook(book)
-    }
-    
-    private func extractTitle(from filename: String) -> String {
-        // Simple title extraction from filename
-        let nameWithoutExtension = URL(fileURLWithPath: filename).deletingPathExtension().lastPathComponent
-        return nameWithoutExtension.replacingOccurrences(of: "_", with: " ")
-            .replacingOccurrences(of: "-", with: " ")
     }
     
     // MARK: - Sorting and Filtering

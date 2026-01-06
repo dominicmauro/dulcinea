@@ -92,20 +92,25 @@ struct ReaderView: View {
         VStack(alignment: .leading, spacing: viewModel.lineSpacing * 10) {
             if !viewModel.chapters.isEmpty {
                 let currentChapter = viewModel.chapters[viewModel.currentChapter]
-                
+
                 Text(currentChapter.title)
                     .font(viewModel.fontFamily == .systemDefault ? .system(size: viewModel.fontSize + 4) : .custom(viewModel.fontFamily.fontName, size: viewModel.fontSize + 4))
                     .fontWeight(.semibold)
                     .foregroundColor(Color(hex: viewModel.backgroundColor.color.text))
                     .padding(.bottom, 20)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityLabel("Chapter title: \(currentChapter.title)")
 
                 Text(currentChapter.content)
                     .font(viewModel.fontFamily == .systemDefault ? .system(size: viewModel.fontSize) : .custom(viewModel.fontFamily.fontName, size: viewModel.fontSize))
                     .lineSpacing(viewModel.lineSpacing * viewModel.fontSize * 0.2)
                     .foregroundColor(Color(hex: viewModel.backgroundColor.color.text))
                     .textSelection(.enabled)
+                    .accessibilityLabel("Chapter content")
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityHint("Tap anywhere to show reading controls. Swipe left or right to change chapters.")
     }
     
     private var emptyChapterView: some View {
@@ -166,26 +171,31 @@ struct ReaderView: View {
                     coordinator.dismissReader()
                 }
                 .foregroundColor(.white)
-                
+                .accessibilityLabel("Close book")
+                .accessibilityHint("Returns to the library")
+
                 Spacer()
-                
+
                 Text(book.title)
                     .font(.headline)
                     .foregroundColor(.white)
                     .lineLimit(1)
-                
+                    .accessibilityAddTraits(.isHeader)
+
                 Spacer()
-                
+
                 Button("Settings") {
                     viewModel.showSettings()
                 }
                 .foregroundColor(.white)
+                .accessibilityLabel("Reading settings")
+                .accessibilityHint("Opens font, color, and spacing options")
             }
             .padding()
             .background(Color.black.opacity(0.8))
-            
+
             Spacer()
-            
+
             // Bottom controls
             VStack(spacing: 15) {
                 // Progress bar
@@ -194,18 +204,21 @@ struct ReaderView: View {
                         Text("Chapter \(viewModel.currentChapter + 1) of \(viewModel.chapters.count)")
                             .font(.caption)
                             .foregroundColor(.white)
-                        
+
                         Spacer()
-                        
+
                         Text("\(Int(viewModel.readingProgress * 100))%")
                             .font(.caption)
                             .foregroundColor(.white)
                     }
-                    
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Reading progress: Chapter \(viewModel.currentChapter + 1) of \(viewModel.chapters.count), \(Int(viewModel.readingProgress * 100)) percent complete")
+
                     ProgressView(value: viewModel.readingProgress)
                         .progressViewStyle(LinearProgressViewStyle(tint: .white))
+                        .accessibilityHidden(true)
                 }
-                
+
                 // Navigation controls
                 HStack(spacing: 30) {
                     Button(action: viewModel.goToPreviousChapter) {
@@ -214,20 +227,26 @@ struct ReaderView: View {
                             .foregroundColor(viewModel.currentChapter > 0 ? .white : .gray)
                     }
                     .disabled(viewModel.currentChapter <= 0)
-                    
+                    .accessibilityLabel("Previous chapter")
+                    .accessibilityHint(viewModel.currentChapter > 0 ? "Go to chapter \(viewModel.currentChapter)" : "Already at first chapter")
+
                     Button("Contents") {
                         // Show table of contents
                     }
                     .foregroundColor(.white)
-                    
+                    .accessibilityLabel("Table of contents")
+                    .accessibilityHint("Shows chapter list")
+
                     Button(action: viewModel.goToNextChapter) {
                         Image(systemName: "chevron.right")
                             .font(.title2)
                             .foregroundColor(viewModel.currentChapter < viewModel.chapters.count - 1 ? .white : .gray)
                     }
                     .disabled(viewModel.currentChapter >= viewModel.chapters.count - 1)
+                    .accessibilityLabel("Next chapter")
+                    .accessibilityHint(viewModel.currentChapter < viewModel.chapters.count - 1 ? "Go to chapter \(viewModel.currentChapter + 2)" : "Already at last chapter")
                 }
-                
+
                 // Additional controls
                 HStack(spacing: 40) {
                     Button(action: {
@@ -241,7 +260,9 @@ struct ReaderView: View {
                         }
                         .foregroundColor(.white)
                     }
-                    
+                    .accessibilityLabel("Add bookmark")
+                    .accessibilityHint("Saves current reading position")
+
                     Button(action: viewModel.toggleSpeech) {
                         VStack {
                             Image(systemName: viewModel.isSpeaking ? "speaker.slash" : "speaker.wave.2")
@@ -251,7 +272,9 @@ struct ReaderView: View {
                         }
                         .foregroundColor(.white)
                     }
-                    
+                    .accessibilityLabel(viewModel.isSpeaking ? "Stop speaking" : "Read aloud")
+                    .accessibilityHint(viewModel.isSpeaking ? "Stops text-to-speech" : "Reads the chapter aloud")
+
                     Button(action: {
                         // Share current chapter
                     }) {
@@ -263,6 +286,8 @@ struct ReaderView: View {
                         }
                         .foregroundColor(.white)
                     }
+                    .accessibilityLabel("Share")
+                    .accessibilityHint("Share current chapter")
                 }
             }
             .padding()
@@ -336,21 +361,27 @@ struct ReaderView: View {
             Text("Font Size")
                 .font(.subheadline)
                 .fontWeight(.medium)
-            
+                .accessibilityAddTraits(.isHeader)
+
             HStack {
                 Text("A")
                     .font(.caption)
-                
+                    .accessibilityHidden(true)
+
                 Slider(value: $viewModel.fontSize, in: 10...30, step: 1)
-                
+                    .accessibilityLabel("Font size")
+                    .accessibilityValue("\(Int(viewModel.fontSize)) points")
+
                 Text("A")
                     .font(.title3)
                     .fontWeight(.bold)
+                    .accessibilityHidden(true)
             }
-            
+
             Text("Sample text at \(Int(viewModel.fontSize))pt")
                 .font(viewModel.fontFamily == .systemDefault ? .system(size: viewModel.fontSize) : .custom(viewModel.fontFamily.fontName, size: viewModel.fontSize))
                 .foregroundColor(.secondary)
+                .accessibilityHidden(true)
         }
     }
     
@@ -359,7 +390,8 @@ struct ReaderView: View {
             Text("Font Family")
                 .font(.subheadline)
                 .fontWeight(.medium)
-            
+                .accessibilityAddTraits(.isHeader)
+
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 10) {
                 ForEach(FontFamily.allCases, id: \.self) { font in
                     Button(action: {
@@ -369,7 +401,7 @@ struct ReaderView: View {
                             Text("Aa")
                                 .font(font == .systemDefault ? .system(size: 20) : .custom(font.fontName, size: 20))
                                 .foregroundColor(viewModel.fontFamily == font ? .white : .primary)
-                            
+
                             Text(font.displayName)
                                 .font(.caption)
                                 .foregroundColor(viewModel.fontFamily == font ? .white : .secondary)
@@ -379,6 +411,9 @@ struct ReaderView: View {
                         .background(viewModel.fontFamily == font ? Color.blue : Color(.systemGray6))
                         .cornerRadius(8)
                     }
+                    .accessibilityLabel("\(font.displayName) font")
+                    .accessibilityAddTraits(viewModel.fontFamily == font ? [.isSelected] : [])
+                    .accessibilityHint(viewModel.fontFamily == font ? "Currently selected" : "Double tap to select")
                 }
             }
         }
@@ -389,7 +424,8 @@ struct ReaderView: View {
             Text("Color Theme")
                 .font(.subheadline)
                 .fontWeight(.medium)
-            
+                .accessibilityAddTraits(.isHeader)
+
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 10) {
                 ForEach(BackgroundColor.allCases, id: \.self) { theme in
                     Button(action: {
@@ -404,7 +440,7 @@ struct ReaderView: View {
                                         .stroke(Color(hex: theme.color.text), lineWidth: 2)
                                         .frame(width: 20, height: 20)
                                 )
-                            
+
                             Text(theme.displayName)
                                 .font(.caption)
                                 .foregroundColor(viewModel.backgroundColor == theme ? .blue : .secondary)
@@ -414,6 +450,9 @@ struct ReaderView: View {
                         .background(viewModel.backgroundColor == theme ? Color.blue.opacity(0.1) : Color.clear)
                         .cornerRadius(8)
                     }
+                    .accessibilityLabel("\(theme.displayName) theme")
+                    .accessibilityAddTraits(viewModel.backgroundColor == theme ? [.isSelected] : [])
+                    .accessibilityHint(viewModel.backgroundColor == theme ? "Currently selected" : "Double tap to select")
                 }
             }
         }
@@ -425,32 +464,42 @@ struct ReaderView: View {
                 Text("Line Spacing")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                
+                    .accessibilityAddTraits(.isHeader)
+
                 HStack {
                     Image(systemName: "text.alignleft")
                         .font(.caption)
-                    
+                        .accessibilityHidden(true)
+
                     Slider(value: $viewModel.lineSpacing, in: 1.0...2.0, step: 0.1)
-                    
+                        .accessibilityLabel("Line spacing")
+                        .accessibilityValue(String(format: "%.1fx", viewModel.lineSpacing))
+
                     Image(systemName: "text.alignleft")
                         .font(.caption)
                         .scaleEffect(1.5)
+                        .accessibilityHidden(true)
                 }
             }
-            
+
             VStack(alignment: .leading, spacing: 10) {
                 Text("Margins")
                     .font(.subheadline)
                     .fontWeight(.medium)
-                
+                    .accessibilityAddTraits(.isHeader)
+
                 HStack {
                     Text("Narrow")
                         .font(.caption)
-                    
+                        .accessibilityHidden(true)
+
                     Slider(value: $viewModel.margin, in: 10...50, step: 5)
-                    
+                        .accessibilityLabel("Page margins")
+                        .accessibilityValue("\(Int(viewModel.margin)) points")
+
                     Text("Wide")
                         .font(.caption)
+                        .accessibilityHidden(true)
                 }
             }
         }

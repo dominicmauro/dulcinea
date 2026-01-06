@@ -31,6 +31,7 @@ class AppCoordinator: ObservableObject {
         // Initialize view models with dependencies
         self.libraryViewModel = LibraryViewModel(
             storageService: storageService,
+            epubService: epubService,
             syncService: syncService
         )
         self.readerViewModel = ReaderViewModel(
