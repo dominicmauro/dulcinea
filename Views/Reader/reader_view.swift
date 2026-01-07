@@ -1,20 +1,22 @@
 import SwiftUI
+import UIKit
 
 struct ReaderView: View {
     let book: Book
     @EnvironmentObject var viewModel: ReaderViewModel
     @EnvironmentObject var coordinator: AppCoordinator
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var dragOffset: CGSize = .zero
     @State private var lastDragValue: DragGesture.Value?
-    
+    @State private var showingShareSheet = false
+
     var body: some View {
         ZStack {
             // Background color
             Color(hex: viewModel.backgroundColor.color.background)
                 .ignoresSafeArea()
-            
+
             if viewModel.isLoading {
                 loadingView
             } else if let errorMessage = viewModel.errorMessage {
@@ -22,15 +24,25 @@ struct ReaderView: View {
             } else {
                 readerContent
             }
-            
+
             // Reading menu overlay
             if viewModel.isMenuVisible {
                 readerMenu
             }
-            
+
             // Settings overlay
             if viewModel.isSettingsVisible {
                 settingsOverlay
+            }
+
+            // Bookmarks overlay
+            if viewModel.isBookmarksVisible {
+                bookmarksOverlay
+            }
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            if let shareContent = viewModel.getShareContent() {
+                ShareSheet(items: [shareContent])
             }
         }
         .navigationBarHidden(true)
@@ -250,18 +262,22 @@ struct ReaderView: View {
                 // Additional controls
                 HStack(spacing: 40) {
                     Button(action: {
-                        // Bookmark current position
+                        if viewModel.hasBookmarkAtCurrentPosition() {
+                            viewModel.showBookmarks()
+                        } else {
+                            viewModel.addBookmark()
+                        }
                     }) {
                         VStack {
-                            Image(systemName: "bookmark")
+                            Image(systemName: viewModel.hasBookmarkAtCurrentPosition() ? "bookmark.fill" : "bookmark")
                                 .font(.title3)
                             Text("Bookmark")
                                 .font(.caption)
                         }
                         .foregroundColor(.white)
                     }
-                    .accessibilityLabel("Add bookmark")
-                    .accessibilityHint("Saves current reading position")
+                    .accessibilityLabel(viewModel.hasBookmarkAtCurrentPosition() ? "View bookmarks" : "Add bookmark")
+                    .accessibilityHint(viewModel.hasBookmarkAtCurrentPosition() ? "Shows saved bookmarks" : "Saves current reading position")
 
                     Button(action: viewModel.toggleSpeech) {
                         VStack {
@@ -276,7 +292,7 @@ struct ReaderView: View {
                     .accessibilityHint(viewModel.isSpeaking ? "Stops text-to-speech" : "Reads the chapter aloud")
 
                     Button(action: {
-                        // Share current chapter
+                        showingShareSheet = true
                     }) {
                         VStack {
                             Image(systemName: "square.and.arrow.up")
@@ -287,7 +303,7 @@ struct ReaderView: View {
                         .foregroundColor(.white)
                     }
                     .accessibilityLabel("Share")
-                    .accessibilityHint("Share current chapter")
+                    .accessibilityHint("Share an excerpt from the current chapter")
                 }
             }
             .padding()
@@ -504,7 +520,102 @@ struct ReaderView: View {
             }
         }
     }
-    
+
+    // MARK: - Bookmarks Overlay
+
+    private var bookmarksOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    viewModel.hideBookmarks()
+                }
+
+            VStack(spacing: 0) {
+                Spacer()
+
+                VStack(spacing: 0) {
+                    // Header
+                    HStack {
+                        Text("Bookmarks")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .accessibilityAddTraits(.isHeader)
+
+                        Spacer()
+
+                        Button("Done") {
+                            viewModel.hideBookmarks()
+                        }
+                        .fontWeight(.medium)
+                        .accessibilityLabel("Close bookmarks")
+                    }
+                    .padding()
+
+                    Divider()
+
+                    if viewModel.bookmarks.isEmpty {
+                        VStack(spacing: 15) {
+                            Image(systemName: "bookmark")
+                                .font(.system(size: 40))
+                                .foregroundColor(.gray)
+                                .accessibilityHidden(true)
+
+                            Text("No Bookmarks")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+
+                            Text("Tap the bookmark button while reading to save your place")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                        .padding(.vertical, 40)
+                    } else {
+                        List {
+                            ForEach(viewModel.bookmarks) { bookmark in
+                                Button(action: {
+                                    viewModel.goToBookmark(bookmark)
+                                }) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(bookmark.chapterTitle)
+                                            .font(.headline)
+                                            .foregroundColor(.primary)
+
+                                        if let note = bookmark.note {
+                                            Text(note)
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                                .lineLimit(2)
+                                        }
+
+                                        Text(bookmark.dateCreated, style: .relative)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .accessibilityLabel("\(bookmark.chapterTitle), bookmarked \(bookmark.dateCreated, style: .relative)")
+                                .accessibilityHint("Double tap to go to this bookmark")
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button("Delete", role: .destructive) {
+                                        viewModel.removeBookmark(bookmark)
+                                    }
+                                }
+                            }
+                        }
+                        .listStyle(PlainListStyle())
+                        .frame(maxHeight: 300)
+                    }
+                }
+                .background(Color(.systemBackground))
+                .cornerRadius(20)
+                .padding(.horizontal)
+            }
+        }
+    }
+
     // MARK: - Gesture Handling
     
     private func handlePageTurn(_ value: DragGesture.Value, geometry: GeometryProxy) {
@@ -551,6 +662,18 @@ extension Color {
             opacity: Double(a) / 255
         )
     }
+}
+
+// MARK: - Share Sheet
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 #Preview {
