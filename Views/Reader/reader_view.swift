@@ -43,74 +43,102 @@ struct ReaderView: View {
         .onDisappear {
             viewModel.closeBook()
         }
-        .gesture(
-            TapGesture()
-                .onEnded { _ in
-                    viewModel.toggleMenu()
-                }
-        )
     }
     
     // MARK: - Reading Content
     
     private var readerContent: some View {
         GeometryReader { geometry in
-            if !viewModel.chapters.isEmpty {
-                ScrollView(.vertical, showsIndicators: false) {
-                    LazyVStack(spacing: 0) {
-                        chapterContent
-                            .padding(.horizontal, viewModel.margin)
-                            .padding(.vertical, 40)
+            if !viewModel.chapters.isEmpty && !viewModel.paginatedPages.isEmpty {
+                pageView(geometry: geometry)
+                    .onAppear {
+                        viewModel.updatePageSize(geometry.size)
                     }
+                    .onChange(of: geometry.size) {
+                        viewModel.updatePageSize(geometry.size)
+                    }
+            } else if !viewModel.chapters.isEmpty {
+                // Chapters loaded but not yet paginated
+                Color.clear.onAppear {
+                    viewModel.updatePageSize(geometry.size)
                 }
-                .scrollPosition(id: .init(get: {
-                    viewModel.currentPosition
-                }, set: { newValue in
-                    if let position = newValue {
-                        viewModel.updatePosition(position)
-                    }
-                }))
-                .gesture(
-                    DragGesture()
-                        .onChanged { value in
-                            lastDragValue = value
-                            dragOffset = value.translation
-                        }
-                        .onEnded { value in
-                            handlePageTurn(value, geometry: geometry)
-                            dragOffset = .zero
-                            lastDragValue = nil
-                        }
-                )
             } else {
                 emptyChapterView
             }
         }
     }
     
-    private var chapterContent: some View {
-        VStack(alignment: .leading, spacing: viewModel.lineSpacing * 10) {
-            if !viewModel.chapters.isEmpty {
-                let currentChapter = viewModel.chapters[viewModel.currentChapter]
-
-                Text(currentChapter.title)
-                    .font(viewModel.fontFamily == .systemDefault ? .system(size: viewModel.fontSize + 4) : .custom(viewModel.fontFamily.fontName, size: viewModel.fontSize + 4))
-                    .fontWeight(.semibold)
-                    .foregroundColor(Color(hex: viewModel.backgroundColor.color.text))
-                    .padding(.bottom, 20)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityLabel("Chapter title: \(currentChapter.title)")
-
-                Text(currentChapter.content)
-                    .font(viewModel.fontFamily == .systemDefault ? .system(size: viewModel.fontSize) : .custom(viewModel.fontFamily.fontName, size: viewModel.fontSize))
-                    .lineSpacing(viewModel.lineSpacing * viewModel.fontSize * 0.2)
-                    .foregroundColor(Color(hex: viewModel.backgroundColor.color.text))
-                    .textSelection(.enabled)
-                    .accessibilityLabel("Chapter content")
+    private func pageView(geometry: GeometryProxy) -> some View {
+        let pages = viewModel.paginatedPages
+        let currentPage = min(viewModel.currentPage, pages.count - 1)
+        
+        return ZStack {
+            // Current page text
+            pageContentView(for: pages[currentPage])
+                .padding(.horizontal, viewModel.margin)
+                .padding(.vertical, 40)
+                .offset(x: dragOffset.width)
+            
+            // Page number at bottom
+            VStack {
+                Spacer()
+                if !viewModel.isMenuVisible {
+                    Text("Page \(currentPage + 1) of \(viewModel.totalPagesInChapter)")
+                        .font(.caption2)
+                        .foregroundColor(Color(hex: viewModel.backgroundColor.color.text).opacity(0.4))
+                        .padding(.bottom, 8)
+                }
+            }
+            
+            // Tap zones overlay
+            HStack(spacing: 0) {
+                // Left zone - previous page
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { viewModel.goToPreviousPage() }
+                    .frame(width: geometry.size.width * 0.25)
+                
+                // Center zone - toggle menu
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { viewModel.toggleMenu() }
+                
+                // Right zone - next page
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { viewModel.goToNextPage() }
+                    .frame(width: geometry.size.width * 0.25)
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityHint("Tap anywhere to show reading controls. Swipe left or right to change chapters.")
+        .frame(width: geometry.size.width, height: geometry.size.height)
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 30)
+                .onChanged { value in
+                    lastDragValue = value
+                    dragOffset = value.translation
+                }
+                .onEnded { value in
+                    handlePageTurn(value, geometry: geometry)
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        dragOffset = .zero
+                    }
+                    lastDragValue = nil
+                }
+        )
+    }
+    
+    private func pageContentView(for page: PageContent) -> some View {
+        Text(page.text)
+            .font(viewModel.fontFamily == .systemDefault
+                ? .system(size: viewModel.fontSize)
+                : .custom(viewModel.fontFamily.fontName, size: viewModel.fontSize))
+            .lineSpacing(viewModel.lineSpacing * viewModel.fontSize * 0.2)
+            .foregroundColor(Color(hex: viewModel.backgroundColor.color.text))
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .accessibilityLabel("Page \(page.pageIndexInChapter + 1) content")
+            .accessibilityHint("Swipe left for next page, swipe right for previous page. Tap center to show reading controls.")
     }
     
     private var emptyChapterView: some View {
@@ -201,7 +229,13 @@ struct ReaderView: View {
                 // Progress bar
                 VStack(spacing: 8) {
                     HStack {
-                        Text("Chapter \(viewModel.currentChapter + 1) of \(viewModel.chapters.count)")
+                        Text("Ch. \(viewModel.currentChapter + 1)/\(viewModel.chapters.count)")
+                            .font(.caption)
+                            .foregroundColor(.white)
+
+                        Spacer()
+                        
+                        Text("Page \(viewModel.currentPage + 1)/\(viewModel.totalPagesInChapter)")
                             .font(.caption)
                             .foregroundColor(.white)
 
@@ -212,7 +246,7 @@ struct ReaderView: View {
                             .foregroundColor(.white)
                     }
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Reading progress: Chapter \(viewModel.currentChapter + 1) of \(viewModel.chapters.count), \(Int(viewModel.readingProgress * 100)) percent complete")
+                    .accessibilityLabel("Reading progress: Chapter \(viewModel.currentChapter + 1) of \(viewModel.chapters.count), page \(viewModel.currentPage + 1) of \(viewModel.totalPagesInChapter), \(Int(viewModel.readingProgress * 100)) percent complete")
 
                     ProgressView(value: viewModel.readingProgress)
                         .progressViewStyle(LinearProgressViewStyle(tint: .white))
@@ -511,15 +545,17 @@ struct ReaderView: View {
         let horizontalThreshold: CGFloat = 50
         let verticalThreshold: CGFloat = 100
         
-        // Horizontal swipe for chapter navigation
-        if abs(value.translation.width) > horizontalThreshold && abs(value.translation.height) < verticalThreshold {
-            if value.translation.width > 0 {
-                // Swipe right - previous chapter
-                viewModel.goToPreviousChapter()
-            } else {
-                // Swipe left - next chapter
-                viewModel.goToNextChapter()
-            }
+        guard abs(value.translation.width) > horizontalThreshold,
+              abs(value.translation.height) < verticalThreshold else {
+            return
+        }
+        
+        if value.translation.width < 0 {
+            // Swipe left -> next page
+            viewModel.goToNextPage()
+        } else {
+            // Swipe right -> previous page
+            viewModel.goToPreviousPage()
         }
     }
 }

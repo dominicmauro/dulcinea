@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F27CB4722F52935100C172B9 /* TextPaginator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F27CB4712F52935100C172B9 /* TextPaginator.swift */; };
+		F27CB4742F5294FC00C172B9 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F27CB4732F5294FC00C172B9 /* KeychainService.swift */; };
 		F29E22062DFA55E600A81930 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F29E22052DFA55E600A81930 /* Assets.xcassets */; };
 		F29E22292DFA57EC00A81930 /* dulcineaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E22282DFA57EC00A81930 /* dulcineaApp.swift */; };
 		F29E222C2DFA587200A81930 /* AppCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E222B2DFA587200A81930 /* AppCoordinator.swift */; };
@@ -46,6 +48,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		F27CB4712F52935100C172B9 /* TextPaginator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextPaginator.swift; sourceTree = "<group>"; };
+		F27CB4732F5294FC00C172B9 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		F29E22052DFA55E600A81930 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F29E22282DFA57EC00A81930 /* dulcineaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = dulcineaApp.swift; sourceTree = "<group>"; };
 		F29E222B2DFA587200A81930 /* AppCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCoordinator.swift; sourceTree = "<group>"; };
@@ -156,6 +160,8 @@
 				F29E224C2DFA63C400A81930 /* KOSyncService.swift */,
 				F29E224D2DFA63C400A81930 /* OPDSService.swift */,
 				F29E22362DFA58BF00A81930 /* StorageService.swift */,
+				F27CB4712F52935100C172B9 /* TextPaginator.swift */,
+				F27CB4732F5294FC00C172B9 /* KeychainService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -367,9 +373,11 @@
 				F29E22292DFA57EC00A81930 /* dulcineaApp.swift in Sources */,
 				F29E22442DFA5BAE00A81930 /* BrowseViewModel.swift in Sources */,
 				F29E22452DFA5BAE00A81930 /* LibraryViewModel.swift in Sources */,
+				F27CB4722F52935100C172B9 /* TextPaginator.swift in Sources */,
 				F29E22462DFA5BAE00A81930 /* ReaderViewModel.swift in Sources */,
 				F29E22472DFA5BAE00A81930 /* SettingsViewModel.swift in Sources */,
 				F29E22582DFA6B9100A81930 /* reader_view.swift in Sources */,
+				F27CB4742F5294FC00C172B9 /* KeychainService.swift in Sources */,
 				F29E22592DFA6B9100A81930 /* browse_view.swift in Sources */,
 				F29E225C2DFA6BBA00A81930 /* library_view.swift in Sources */,
 				F29E225A2DFA6B9100A81930 /* settings_view.swift in Sources */,

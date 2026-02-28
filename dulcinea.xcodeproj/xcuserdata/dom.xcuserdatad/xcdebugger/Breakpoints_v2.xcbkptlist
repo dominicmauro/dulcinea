@@ -34,6 +34,50 @@
             endingLineNumber = "100"
             landmarkName = "ReaderViewModel"
             landmarkType = "3">
+            <Locations>
+               <Location
+                  uuid = "22334A10-466F-4C42-B7BD-73DEC2D1D349 - 79fd71e3e365b207"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "dulcinea.ReaderViewModel.goToPreviousChapter() -&gt; ()"
+                  moduleName = "dulcinea.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/dom/Documents/Code/dulcinea/dulcinea/ViewModels/ReaderViewModel.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "100"
+                  endingLineNumber = "100">
+               </Location>
+               <Location
+                  uuid = "22334A10-466F-4C42-B7BD-73DEC2D1D349 - 517323717ed33721"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "dulcinea.ReaderViewModel.closeBook() -&gt; ()"
+                  moduleName = "dulcinea.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/dom/Documents/Code/dulcinea/dulcinea/ViewModels/ReaderViewModel.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "100"
+                  endingLineNumber = "100">
+               </Location>
+               <Location
+                  uuid = "22334A10-466F-4C42-B7BD-73DEC2D1D349 - 517323717ed33721"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "dulcinea.ReaderViewModel.closeBook() -&gt; ()"
+                  moduleName = "dulcinea.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/dom/Documents/Code/dulcinea/dulcinea/ViewModels/ReaderViewModel.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "100"
+                  endingLineNumber = "100">
+               </Location>
+            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

@@ -23,6 +23,14 @@ class ReaderViewModel: ObservableObject {
     @Published var isSettingsVisible = false
     @Published var readingProgress: Double = 0.0
     
+    // Pagination state
+    @Published var currentPage: Int = 0
+    @Published var totalPagesInChapter: Int = 1
+    @Published var paginatedPages: [PageContent] = []
+    
+    private let paginator = TextPaginator()
+    private var pageSize: CGSize = .zero
+    
     private let epubService: EPUBService
     private let syncService: KOSyncService
     private let storageService: StorageService
@@ -39,6 +47,7 @@ class ReaderViewModel: ObservableObject {
 
         loadReadingSettings()
         setupProgressTracking()
+        setupSettingsObservers()
     }
 
     deinit {
@@ -62,6 +71,12 @@ class ReaderViewModel: ObservableObject {
             chapters = bookContent.chapters
             currentChapter = book.currentChapter
             currentPosition = book.currentPosition
+            
+            // Paginate if page size is already known (e.g. re-loading)
+            if pageSize.width > 0 && pageSize.height > 0 {
+                repaginate()
+                restorePageFromPosition()
+            }
             updateReadingProgress()
             
             // Mark book as opened
@@ -92,52 +107,129 @@ class ReaderViewModel: ObservableObject {
         chapters = []
         currentChapter = 0
         currentPosition = 0.0
+        currentPage = 0
+        totalPagesInChapter = 1
+        paginatedPages = []
         readingProgress = 0.0
     }
     
     // MARK: - Navigation
     
+    func goToNextPage() {
+        if currentPage < totalPagesInChapter - 1 {
+            currentPage += 1
+            updateReadingProgress()
+            saveProgress()
+        } else {
+            // Last page of chapter -> advance to next chapter
+            guard currentChapter < chapters.count - 1 else { return }
+            currentChapter += 1
+            currentPage = 0
+            repaginate()
+            saveProgress()
+        }
+    }
+    
+    func goToPreviousPage() {
+        if currentPage > 0 {
+            currentPage -= 1
+            updateReadingProgress()
+            saveProgress()
+        } else {
+            // First page of chapter -> go to previous chapter's last page
+            guard currentChapter > 0 else { return }
+            currentChapter -= 1
+            repaginate()
+            currentPage = max(0, totalPagesInChapter - 1)
+            updateReadingProgress()
+            saveProgress()
+        }
+    }
+    
     func goToNextChapter() {
         guard currentChapter < chapters.count - 1 else { return }
-        
         currentChapter += 1
+        currentPage = 0
         currentPosition = 0.0
-        updateReadingProgress()
+        repaginate()
         saveProgress()
     }
     
     func goToPreviousChapter() {
         guard currentChapter > 0 else { return }
-        
         currentChapter -= 1
+        currentPage = 0
         currentPosition = 0.0
-        updateReadingProgress()
+        repaginate()
         saveProgress()
     }
     
     func goToChapter(_ chapterIndex: Int) {
         guard chapterIndex >= 0 && chapterIndex < chapters.count else { return }
-        
         currentChapter = chapterIndex
+        currentPage = 0
         currentPosition = 0.0
-        updateReadingProgress()
+        repaginate()
         saveProgress()
     }
     
-    func updatePosition(_ position: Double) {
-        currentPosition = max(0.0, min(1.0, position))
-        updateReadingProgress()
-
-        // Debounced progress saving
-        progressSaveTask?.cancel()
-        progressSaveTask = Task {
-            try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-            if !Task.isCancelled {
-                saveProgress()
-            }
+    // MARK: - Pagination
+    
+    func updatePageSize(_ size: CGSize) {
+        let effectiveWidth = size.width - (margin * 2)
+        let effectiveHeight = size.height - 80 // 40pt top + 40pt bottom padding
+        let newSize = CGSize(width: effectiveWidth, height: effectiveHeight)
+        
+        guard newSize != pageSize, newSize.width > 0, newSize.height > 0 else { return }
+        pageSize = newSize
+        repaginate()
+        
+        // Restore page position when first receiving page size after book load
+        if currentPosition > 0 && currentPage == 0 && totalPagesInChapter > 1 {
+            restorePageFromPosition()
         }
     }
     
+    func repaginate() {
+        guard !chapters.isEmpty,
+              currentChapter < chapters.count,
+              pageSize.width > 0, pageSize.height > 0 else { return }
+        
+        let chapter = chapters[currentChapter]
+        let size = pageSize
+        let fs = fontSize
+        let ff = fontFamily
+        let ls = lineSpacing
+        let ci = currentChapter
+        
+        let result = paginator.paginate(
+            text: chapter.content,
+            title: chapter.title,
+            pageSize: size,
+            fontSize: fs,
+            fontFamily: ff,
+            lineSpacing: ls,
+            chapterIndex: ci
+        )
+        
+        paginatedPages = result.pages
+        totalPagesInChapter = result.pages.count
+        
+        if currentPage >= totalPagesInChapter {
+            currentPage = max(0, totalPagesInChapter - 1)
+        }
+        
+        updateReadingProgress()
+    }
+    
+    private func restorePageFromPosition() {
+        guard totalPagesInChapter > 1 else {
+            currentPage = 0
+            return
+        }
+        currentPage = Int(round(currentPosition * Double(totalPagesInChapter - 1)))
+        currentPage = max(0, min(currentPage, totalPagesInChapter - 1))
+    }
     
     private func updateReadingProgress() {
         guard !chapters.isEmpty else {
@@ -145,9 +237,26 @@ class ReaderViewModel: ObservableObject {
             return
         }
         
+        // Derive position within chapter from page index
+        if totalPagesInChapter > 1 {
+            currentPosition = Double(currentPage) / Double(totalPagesInChapter - 1)
+        } else {
+            currentPosition = 0.0
+        }
+        
         let chapterProgress = Double(currentChapter) / Double(chapters.count)
         let positionProgress = currentPosition / Double(chapters.count)
         readingProgress = chapterProgress + positionProgress
+    }
+    
+    private func setupSettingsObservers() {
+        Publishers.CombineLatest4($fontSize, $fontFamily, $lineSpacing, $margin)
+            .dropFirst()
+            .debounce(for: .milliseconds(200), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.repaginate()
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Progress Management
