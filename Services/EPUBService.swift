@@ -2,7 +2,7 @@ import Foundation
 import Combine
 import ZIPFoundation
 
-class EPUBService: ObservableObject {
+class EPUBService: ObservableObject, @unchecked Sendable {
     private let storageService: StorageService
     
     init(storageService: StorageService) {
@@ -53,8 +53,8 @@ class EPUBService: ObservableObject {
                 let parentDir = destinationURL.deletingLastPathComponent()
                 try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
                 
-                // Extract the entry
-                _ = try archive.extract(entry, to: destinationURL.deletingLastPathComponent())
+                // Extract the entry to its full destination path
+                _ = try archive.extract(entry, to: destinationURL)
             }
         } catch {
             throw EPUBError.extractionFailed
@@ -241,7 +241,7 @@ class EPUBService: ObservableObject {
                 let destinationURL = tempDir.appendingPathComponent(entry.path)
                 let parentDir = destinationURL.deletingLastPathComponent()
                 try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
-                _ = try archive.extract(entry, to: parentDir)
+                _ = try archive.extract(entry, to: destinationURL)
             }
             
             // Parse container and OPF to find cover
@@ -290,14 +290,14 @@ class EPUBService: ObservableObject {
         if let coverData = try await extractCoverImage(from: localURL.path) {
             let coverFilename = "\(UUID().uuidString).jpg"
             let coverURL = try storageService.saveCoverImage(coverData, filename: coverFilename)
-            coverImagePath = coverURL.path
+            coverImagePath = storageService.relativePath(for: coverURL.path)
         }
         
         return Book(
             title: content.metadata.title,
             author: content.metadata.author,
             identifier: content.metadata.identifier,
-            filePath: localURL.path,
+            filePath: storageService.relativePath(for: localURL.path),
             coverImagePath: coverImagePath,
             fileSize: Int64(data.count),
             totalChapters: content.chapters.count

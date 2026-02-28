@@ -225,7 +225,7 @@ class KOSyncService: ObservableObject {
     // MARK: - Bulk Sync
     
     func syncAllBooks(_ books: [Book]) async throws {
-        guard let config = configuration else {
+        guard configuration != nil else {
             throw SyncError.configurationMissing
         }
         

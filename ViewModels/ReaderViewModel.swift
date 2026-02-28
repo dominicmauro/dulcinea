@@ -25,14 +25,17 @@ class ReaderViewModel: ObservableObject {
     
     private let epubService: EPUBService
     private let syncService: KOSyncService
+    private let storageService: StorageService
     private var cancellables = Set<AnyCancellable>()
     private var progressTimer: Timer?
     private var readingStartTime: Date?
     private var progressSaveTask: Task<Void, Error>?
     
-    init(epubService: EPUBService, syncService: KOSyncService) {
+    init(epubService: EPUBService, syncService: KOSyncService, storageService: StorageService) {
         self.epubService = epubService
         self.syncService = syncService
+        self.storageService = storageService
+
 
         loadReadingSettings()
         setupProgressTracking()
@@ -54,7 +57,8 @@ class ReaderViewModel: ObservableObject {
         currentBook = book
         
         do {
-            let bookContent = try await epubService.loadEPUB(from: book.filePath)
+            let resolvedPath = storageService.resolveFilePath(book.filePath)
+            let bookContent = try await epubService.loadEPUB(from: resolvedPath)
             chapters = bookContent.chapters
             currentChapter = book.currentChapter
             currentPosition = book.currentPosition
@@ -190,7 +194,9 @@ class ReaderViewModel: ObservableObject {
     private func setupProgressTracking() {
         // Auto-save progress every 30 seconds during active reading
         progressTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
-            self?.saveProgress()
+            Task { @MainActor in
+                self?.saveProgress()
+            }
         }
     }
     

@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-class OPDSService: ObservableObject {
+class OPDSService: ObservableObject, @unchecked Sendable {
     private let storageService: StorageService
     private let urlSession: URLSession
     private var downloadTasks: [String: URLSessionDownloadTask] = [:]
@@ -119,7 +119,7 @@ class OPDSService: ObservableObject {
         
         return try await withCheckedThrowingContinuation { continuation in
             // Declare timer variable first
-            var progressTimer: Timer?
+            nonisolated(unsafe) var progressTimer: Timer?
             
             let task = urlSession.downloadTask(with: request) { [weak self] localURL, response, error in
                 // Clean up timer and task tracking immediately
@@ -144,12 +144,13 @@ class OPDSService: ObservableObject {
                     let filename = self?.generateFilename(from: entry, response: httpResponse) ?? "book.epub"
                     let permanentURL = try self?.storageService.saveEPUBFile(data, filename: filename)
                     
-                    // Create book object
+                    // Create book object with relative path
+                    let relativePath = permanentURL.flatMap { self?.storageService.relativePath(for: $0.path) } ?? ""
                     let book = Book(
                         title: entry.title,
                         author: entry.authorNames,
                         identifier: entry.id,
-                        filePath: permanentURL?.path ?? "",
+                        filePath: relativePath,
                         fileSize: Int64(data.count)
                     )
                     

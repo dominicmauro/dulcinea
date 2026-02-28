@@ -5,8 +5,8 @@ struct Book: Identifiable, Codable, Hashable {
     let title: String
     let author: String
     let identifier: String // ISBN or other unique identifier
-    let filePath: String // Local file path
-    let coverImagePath: String?
+    var filePath: String // Local file path (stored as relative path)
+    var coverImagePath: String?
     let fileSize: Int64
     let dateAdded: Date
     var lastOpened: Date?

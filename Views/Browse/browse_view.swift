@@ -483,7 +483,7 @@ struct BookEntryView: View {
                     .fontWeight(.medium)
             }
             
-        case .failed(let error):
+        case .failed(_):
             VStack(spacing: 4) {
                 HStack {
                     Image(systemName: "exclamationmark.triangle.fill")

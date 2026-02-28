@@ -41,7 +41,11 @@ struct LibraryView: View {
             }
             .searchable(text: $searchText, prompt: "Search books...")
             .sheet(isPresented: $showingImportSheet) {
-                ImportBooksSheet()
+                ImportBooksSheet { urls in
+                    Task {
+                        await viewModel.importEPUBFiles(from: urls)
+                    }
+                }
             }
             .refreshable {
                 await viewModel.syncProgress()
@@ -187,6 +191,8 @@ struct EmptyLibraryView: View {
 struct ImportBooksSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingDocumentPicker = false
+    var onImport: (([URL]) -> Void)?
+
 
     var body: some View {
         NavigationView {
@@ -241,11 +247,10 @@ struct ImportBooksSheet: View {
             allowedContentTypes: [.epub],
             allowsMultipleSelection: true
         ) { result in
-            // Handle file import
             switch result {
             case .success(let urls):
-                // Process imported files
-                print("Imported files: \(urls)")
+                onImport?(urls)
+                dismiss()
             case .failure(let error):
                 print("Import failed: \(error)")
             }

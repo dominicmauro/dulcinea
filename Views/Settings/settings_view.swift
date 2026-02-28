@@ -160,22 +160,22 @@ struct SettingsView: View {
     private var appSettingsSection: some View {
         Section("Download & Storage") {
             Toggle("Download Only on Wi-Fi", isOn: $viewModel.downloadOnlyOnWiFi)
-                .onChange(of: viewModel.downloadOnlyOnWiFi) { _ in
+                .onChange(of: viewModel.downloadOnlyOnWiFi) {
                     viewModel.saveAppSettings()
                 }
             
             Toggle("Show Reading Progress", isOn: $viewModel.showReadingProgress)
-                .onChange(of: viewModel.showReadingProgress) { _ in
+                .onChange(of: viewModel.showReadingProgress) {
                     viewModel.saveAppSettings()
                 }
             
             Toggle("Automatic Backup", isOn: $viewModel.automaticBackup)
-                .onChange(of: viewModel.automaticBackup) { _ in
+                .onChange(of: viewModel.automaticBackup) {
                     viewModel.saveAppSettings()
                 }
             
             Toggle("Delete After Reading", isOn: $viewModel.deleteAfterReading)
-                .onChange(of: viewModel.deleteAfterReading) { _ in
+                .onChange(of: viewModel.deleteAfterReading) {
                     viewModel.saveAppSettings()
                 }
         }
@@ -335,7 +335,7 @@ struct SyncConfigurationSheet: View {
             }
             
             Toggle("Auto Sync", isOn: $viewModel.autoSync)
-                .onChange(of: viewModel.autoSync) { _ in
+                .onChange(of: viewModel.autoSync) {
                     if let config = viewModel.syncConfiguration {
                         viewModel.saveSyncConfiguration(config)
                     }
@@ -347,7 +347,7 @@ struct SyncConfigurationSheet: View {
                         Text(interval.displayName).tag(interval)
                     }
                 }
-                .onChange(of: viewModel.syncInterval) { _ in
+                .onChange(of: viewModel.syncInterval) {
                     if let config = viewModel.syncConfiguration {
                         viewModel.saveSyncConfiguration(config)
                     }
@@ -366,7 +366,7 @@ struct SyncConfigurationSheet: View {
             
             Button("Test Connection") {
                 Task {
-                    if let config = viewModel.syncConfiguration {
+                    if viewModel.syncConfiguration != nil {
                         await viewModel.testSyncConnection()
                     }
                 }
@@ -464,7 +464,7 @@ struct ReadingDefaultsView: View {
                             .font(.caption)
                         
                         Slider(value: $viewModel.defaultReadingSettings.fontSize, in: 10...30, step: 1)
-                            .onChange(of: viewModel.defaultReadingSettings.fontSize) { _ in
+                            .onChange(of: viewModel.defaultReadingSettings.fontSize) {
                                 viewModel.saveDefaultReadingSettings()
                             }
                         
@@ -483,7 +483,7 @@ struct ReadingDefaultsView: View {
                         Text(font.displayName).tag(font)
                     }
                 }
-                .onChange(of: viewModel.defaultReadingSettings.fontFamily) { _ in
+                .onChange(of: viewModel.defaultReadingSettings.fontFamily) {
                     viewModel.saveDefaultReadingSettings()
                 }
             }
@@ -494,7 +494,7 @@ struct ReadingDefaultsView: View {
                         Text(color.displayName).tag(color)
                     }
                 }
-                .onChange(of: viewModel.defaultReadingSettings.backgroundColor) { _ in
+                .onChange(of: viewModel.defaultReadingSettings.backgroundColor) {
                     viewModel.saveDefaultReadingSettings()
                 }
                 
@@ -508,7 +508,7 @@ struct ReadingDefaultsView: View {
                             .font(.caption)
                         
                         Slider(value: $viewModel.defaultReadingSettings.lineSpacing, in: 1.0...2.0, step: 0.1)
-                            .onChange(of: viewModel.defaultReadingSettings.lineSpacing) { _ in
+                            .onChange(of: viewModel.defaultReadingSettings.lineSpacing) {
                                 viewModel.saveDefaultReadingSettings()
                             }
                         
@@ -528,7 +528,7 @@ struct ReadingDefaultsView: View {
                             .font(.caption)
                         
                         Slider(value: $viewModel.defaultReadingSettings.margin, in: 10...50, step: 5)
-                            .onChange(of: viewModel.defaultReadingSettings.margin) { _ in
+                            .onChange(of: viewModel.defaultReadingSettings.margin) {
                                 viewModel.saveDefaultReadingSettings()
                             }
                         

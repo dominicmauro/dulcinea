@@ -36,7 +36,8 @@ class AppCoordinator: ObservableObject {
         )
         self.readerViewModel = ReaderViewModel(
             epubService: epubService,
-            syncService: syncService
+            syncService: syncService,
+            storageService: storageService
         )
         self.browseViewModel = BrowseViewModel(
             opdsService: opdsService,

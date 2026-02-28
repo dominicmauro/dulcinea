@@ -40,7 +40,7 @@ struct ContentView: View {
                 }
                 .tag(AppCoordinator.Tab.settings)
         }
-        .sheet(item: $coordinator.presentedBook) { book in
+        .fullScreenCover(item: $coordinator.presentedBook) { book in
             ReaderView(book: book)
                 .environmentObject(coordinator.readerViewModel)
         }
