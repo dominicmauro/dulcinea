@@ -78,8 +78,8 @@ struct OPDSCatalog: Identifiable, Codable {
     let isEnabled: Bool
     let lastUpdated: Date?
     
-    init(name: String, url: String, username: String? = nil, password: String? = nil) {
-        self.id = UUID()
+    init(id: UUID = UUID(), name: String, url: String, username: String? = nil, password: String? = nil) {
+        self.id = id
         self.name = name
         self.url = url
         self.username = username

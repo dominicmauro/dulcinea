@@ -18,12 +18,14 @@ class OPDSService: ObservableObject, @unchecked Sendable {
     // MARK: - Feed Fetching
     
     func fetchFeed(from url: String, catalog: OPDSCatalog?) async throws -> OPDSFeed {
-        guard let feedURL = URL(string: url) else {
+        let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let feedURL = URL(string: trimmedURL) else {
             throw OPDSError.invalidURL
         }
         
         var request = URLRequest(url: feedURL)
-        request.setValue("application/atom+xml", forHTTPHeaderField: "Accept")
+        request.setValue("application/atom+xml;q=0.9, application/xml;q=0.8, */*;q=0.7", forHTTPHeaderField: "Accept")
+        request.setValue("Dulcinea/1.0", forHTTPHeaderField: "User-Agent")
         
         // Add authentication if required
         if let catalog = catalog, catalog.requiresAuthentication,
@@ -36,7 +38,13 @@ class OPDSService: ObservableObject, @unchecked Sendable {
             }
         }
         
-        let (data, response) = try await urlSession.data(for: request)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await urlSession.data(for: request)
+        } catch {
+            throw OPDSError.networkError(error)
+        }
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw OPDSError.invalidResponse
@@ -452,21 +460,21 @@ enum OPDSError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Invalid catalog URL"
+            return "The catalog URL is invalid. Please check the URL and try again."
         case .invalidResponse:
-            return "Invalid response from catalog server"
+            return "The server returned an unexpected response format."
         case .authenticationRequired:
-            return "Authentication required for this catalog"
+            return "This catalog requires authentication. Please add your username and password in the catalog settings."
         case .serverError(let code):
-            return "Server error: \(code)"
+            return "The server returned an error (HTTP \(code)). Please try again later."
         case .parsingFailed:
-            return "Failed to parse catalog feed"
+            return "The server response could not be parsed as a valid OPDS feed. The server may not be an OPDS catalog."
         case .invalidFeed:
-            return "Invalid catalog feed format"
+            return "The feed was parsed but contains no valid content. Please verify the catalog URL."
         case .downloadFailed(let error):
             return "Download failed: \(error.localizedDescription)"
         case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
+            return "Could not connect to the server: \(error.localizedDescription)"
         }
     }
 }

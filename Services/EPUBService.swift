@@ -189,17 +189,16 @@ class EPUBService: ObservableObject, @unchecked Sendable {
     private func extractTextFromHTML(_ html: String) -> String {
         var processed = html
 
-        // Insert paragraph breaks before block-level elements so they survive tag stripping
-        let blockTags = ["p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "tr"]
-        for tag in blockTags {
-            // Opening tags like <p>, <div class="...">, and self-closing <br/>
-            if let regex = try? NSRegularExpression(pattern: "<\(tag)[\\s>/]", options: .caseInsensitive) {
-                processed = regex.stringByReplacingMatches(
-                    in: processed,
-                    range: NSRange(location: 0, length: processed.utf16.count),
-                    withTemplate: "\n\n<\(tag) "
-                )
-            }
+        // Insert paragraph breaks before block-level opening/closing tags
+        // so they survive tag stripping. We use a lookahead-style insertion
+        // by replacing the tag with \n\n + the tag itself (captured via $0).
+        let blockTagPattern = "(</?(?:p|div|br|h[1-6]|li|blockquote|tr)[\\s>/])"
+        if let regex = try? NSRegularExpression(pattern: blockTagPattern, options: .caseInsensitive) {
+            processed = regex.stringByReplacingMatches(
+                in: processed,
+                range: NSRange(location: 0, length: processed.utf16.count),
+                withTemplate: "\n\n$1"
+            )
         }
 
         // Strip all HTML tags

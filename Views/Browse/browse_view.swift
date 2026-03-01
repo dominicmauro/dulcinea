@@ -34,7 +34,6 @@ struct BrowseView: View {
                             
                             Button("Back to Catalogs") {
                                 viewModel.goToRoot()
-                                viewModel.selectedCatalog = nil
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
@@ -290,12 +289,19 @@ struct BrowseView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
             
-            Button("Retry") {
-                Task {
-                    await viewModel.refreshCurrentFeed()
+            HStack(spacing: 16) {
+                Button("Back to Catalogs") {
+                    viewModel.goToRoot()
                 }
+                .buttonStyle(.bordered)
+
+                Button("Retry") {
+                    Task {
+                        await viewModel.refreshCurrentFeed()
+                    }
+                }
+                .buttonStyle(.borderedProminent)
             }
-            .buttonStyle(.borderedProminent)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -308,53 +314,55 @@ struct CatalogRowView: View {
     let onTap: () -> Void
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(catalog.name)
-                    .font(.headline)
-                    .foregroundColor(catalog.isEnabled ? .primary : .secondary)
-                
-                Text(catalog.url)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                
-                HStack {
-                    if catalog.requiresAuthentication {
-                        Label("Authenticated", systemImage: "lock")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                    }
-                    
-                    if let lastUpdated = catalog.lastUpdated {
-                        Text("Updated \(lastUpdated, style: .relative)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-            
-            Spacer()
-            
-            if !catalog.isEnabled {
-                Text("Disabled")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(6)
-            }
-            
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
+        Button {
             if catalog.isEnabled {
                 onTap()
             }
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(catalog.name)
+                        .font(.headline)
+                        .foregroundColor(catalog.isEnabled ? .primary : .secondary)
+                    
+                    Text(catalog.url)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    
+                    HStack {
+                        if catalog.requiresAuthentication {
+                            Label("Authenticated", systemImage: "lock")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
+                        
+                        if let lastUpdated = catalog.lastUpdated {
+                            Text("Updated \(lastUpdated, style: .relative)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                if !catalog.isEnabled {
+                    Text("Disabled")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.gray.opacity(0.2))
+                        .cornerRadius(6)
+                }
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -567,10 +575,10 @@ struct AddCatalogSheet: View {
                         password = ""
                     }
                     
-                    Button("Standard Ebooks") {
+                    Button("Standard Ebooks (requires membership)") {
                         name = "Standard Ebooks"
                         url = "https://standardebooks.org/feeds/opds"
-                        requiresAuth = false
+                        requiresAuth = true
                         username = ""
                         password = ""
                     }
@@ -607,15 +615,16 @@ struct AddCatalogSheet: View {
         isValidating = true
         validationError = nil
         
+        let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        
         let catalog = OPDSCatalog(
-            name: name,
-            url: url,
+            name: trimmedName,
+            url: trimmedURL,
             username: requiresAuth ? username : nil,
             password: requiresAuth ? password : nil
         )
         
-        // In a real implementation, you would validate the catalog here
-        // For now, we'll just add it
         onAdd(catalog)
         dismiss()
     }
@@ -689,8 +698,9 @@ struct EditCatalogSheet: View {
     
     private func saveCatalog() {
         let updatedCatalog = OPDSCatalog(
-            name: name,
-            url: url,
+            id: catalog.id,
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            url: url.trimmingCharacters(in: .whitespacesAndNewlines),
             username: requiresAuth ? username : nil,
             password: requiresAuth ? password : nil
         )
