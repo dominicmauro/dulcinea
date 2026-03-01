@@ -187,19 +187,86 @@ class EPUBService: ObservableObject, @unchecked Sendable {
     // MARK: - HTML Processing
     
     private func extractTextFromHTML(_ html: String) -> String {
-        // Simple HTML tag removal - in production, use a proper HTML parser
-        let pattern = "<[^>]+>"
-        let regex = try? NSRegularExpression(pattern: pattern)
-        let range = NSRange(location: 0, length: html.utf16.count)
-        let text = regex?.stringByReplacingMatches(in: html, options: [], range: range, withTemplate: "")
-        
-        return text?
+        var processed = html
+
+        // Insert paragraph breaks before block-level elements so they survive tag stripping
+        let blockTags = ["p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "tr"]
+        for tag in blockTags {
+            // Opening tags like <p>, <div class="...">, and self-closing <br/>
+            if let regex = try? NSRegularExpression(pattern: "<\(tag)[\\s>/]", options: .caseInsensitive) {
+                processed = regex.stringByReplacingMatches(
+                    in: processed,
+                    range: NSRange(location: 0, length: processed.utf16.count),
+                    withTemplate: "\n\n<\(tag) "
+                )
+            }
+        }
+
+        // Strip all HTML tags
+        let tagPattern = "<[^>]+>"
+        if let tagRegex = try? NSRegularExpression(pattern: tagPattern) {
+            processed = tagRegex.stringByReplacingMatches(
+                in: processed,
+                options: [],
+                range: NSRange(location: 0, length: processed.utf16.count),
+                withTemplate: ""
+            )
+        }
+
+        // Decode HTML entities
+        processed = processed
             .replacingOccurrences(of: "&nbsp;", with: " ")
             .replacingOccurrences(of: "&amp;", with: "&")
             .replacingOccurrences(of: "&lt;", with: "<")
             .replacingOccurrences(of: "&gt;", with: ">")
             .replacingOccurrences(of: "&quot;", with: "\"")
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&apos;", with: "'")
+            .replacingOccurrences(of: "&#160;", with: " ")
+
+        // Normalize whitespace:
+        // 1. Replace any single newline (not a paragraph break) with a space
+        // 2. Collapse multiple spaces into one
+        // 3. Preserve paragraph breaks (2+ newlines) as double newlines
+
+        // First, normalize line endings
+        processed = processed.replacingOccurrences(of: "\r\n", with: "\n")
+        processed = processed.replacingOccurrences(of: "\r", with: "\n")
+
+        // Protect paragraph breaks (2+ newlines) with a placeholder
+        if let multiNewlineRegex = try? NSRegularExpression(pattern: "\\n\\s*\\n") {
+            processed = multiNewlineRegex.stringByReplacingMatches(
+                in: processed,
+                range: NSRange(location: 0, length: processed.utf16.count),
+                withTemplate: "\u{FFFC}"  // Object replacement character as placeholder
+            )
+        }
+
+        // Replace remaining single newlines with a space
+        processed = processed.replacingOccurrences(of: "\n", with: " ")
+
+        // Restore paragraph breaks
+        processed = processed.replacingOccurrences(of: "\u{FFFC}", with: "\n\n")
+
+        // Collapse multiple spaces into one
+        if let multiSpaceRegex = try? NSRegularExpression(pattern: " {2,}") {
+            processed = multiSpaceRegex.stringByReplacingMatches(
+                in: processed,
+                range: NSRange(location: 0, length: processed.utf16.count),
+                withTemplate: " "
+            )
+        }
+
+        // Collapse more than 2 consecutive newlines
+        if let excessNewlineRegex = try? NSRegularExpression(pattern: "(\\n){3,}") {
+            processed = excessNewlineRegex.stringByReplacingMatches(
+                in: processed,
+                range: NSRange(location: 0, length: processed.utf16.count),
+                withTemplate: "\n\n"
+            )
+        }
+
+        return processed.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     private func extractChapterTitle(from html: String) -> String? {
