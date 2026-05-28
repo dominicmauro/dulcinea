@@ -41,8 +41,11 @@ struct LibraryView: View {
             }
             .searchable(text: $searchText, prompt: "Search books...")
             .sheet(isPresented: $showingImportSheet) {
-                ImportBooksSheet()
-                    .environmentObject(viewModel)
+                ImportBooksSheet { urls in
+                    Task {
+                        await viewModel.importEPUBFiles(from: urls)
+                    }
+                }
             }
             .refreshable {
                 await viewModel.syncProgress()
@@ -197,6 +200,8 @@ struct ImportBooksSheet: View {
     @EnvironmentObject var viewModel: LibraryViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showingDocumentPicker = false
+    var onImport: (([URL]) -> Void)?
+
 
     var body: some View {
         NavigationView {
@@ -251,14 +256,10 @@ struct ImportBooksSheet: View {
             allowedContentTypes: [.epub],
             allowsMultipleSelection: true
         ) { result in
-            // Handle file import
             switch result {
             case .success(let urls):
-                Task {
-                    await viewModel.importEPUBFiles(from: urls)
-                    // Close the sheet so any error surfaces in the library's alert.
-                    dismiss()
-                }
+                onImport?(urls)
+                dismiss()
             case .failure(let error):
                 viewModel.errorMessage = "Import failed: \(error.localizedDescription)"
                 dismiss()

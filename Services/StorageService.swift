@@ -2,7 +2,7 @@ import Foundation
 import Combine
 
 class StorageService: ObservableObject {
-    private let documentsDirectory: URL
+    let documentsDirectory: URL
     private let booksDirectory: URL
     private let coversDirectory: URL
     private let userDefaults = UserDefaults.standard
@@ -45,13 +45,98 @@ class StorageService: ObservableObject {
         loadCatalogs()
     }
     
+    // MARK: - Path Resolution
+    
+    /// Converts an absolute path to a path relative to the documents directory.
+    func relativePath(for absolutePath: String) -> String {
+        let docsPath = documentsDirectory.path
+        if absolutePath.hasPrefix(docsPath) {
+            let relative = String(absolutePath.dropFirst(docsPath.count))
+            // Remove leading slash if present
+            if relative.hasPrefix("/") {
+                return String(relative.dropFirst())
+            }
+            return relative
+        }
+        // Already a relative path
+        return absolutePath
+    }
+    
+    /// Resolves a stored path (relative or absolute) to a valid absolute path.
+    func resolveFilePath(_ storedPath: String) -> String {
+        // If it's already an absolute path that exists, use it
+        if storedPath.hasPrefix("/") && FileManager.default.fileExists(atPath: storedPath) {
+            return storedPath
+        }
+        
+        // If it's an absolute path that doesn't exist, try extracting the relative portion
+        if storedPath.hasPrefix("/") {
+            // Try to find the "Books/" or "Covers/" component and rebuild from there
+            for component in ["Books/", "Covers/"] {
+                if let range = storedPath.range(of: component) {
+                    let relativePart = String(storedPath[range.lowerBound...])
+                    let resolved = documentsDirectory.appendingPathComponent(relativePart).path
+                    if FileManager.default.fileExists(atPath: resolved) {
+                        return resolved
+                    }
+                }
+            }
+        }
+        
+        // Treat as relative path and resolve against documents directory
+        return documentsDirectory.appendingPathComponent(storedPath).path
+    }
+    
     // MARK: - Books Management
     
     private func loadBooks() {
         if let data = userDefaults.data(forKey: Keys.books),
            let decodedBooks = try? JSONDecoder().decode([Book].self, from: data) {
-            self.books = decodedBooks
+            self.books = migrateBookPaths(decodedBooks)
         }
+    }
+    
+    /// Migrates any books with stale absolute paths to relative paths,
+    /// and removes books whose files no longer exist on disk.
+    private func migrateBookPaths(_ books: [Book]) -> [Book] {
+        var migrated = false
+        var result: [Book] = []
+        
+        for var book in books {
+            // Migrate filePath to relative if it's absolute
+            if book.filePath.hasPrefix("/") {
+                let resolved = resolveFilePath(book.filePath)
+                if FileManager.default.fileExists(atPath: resolved) {
+                    book.filePath = relativePath(for: resolved)
+                    if let cover = book.coverImagePath, cover.hasPrefix("/") {
+                        book.coverImagePath = relativePath(for: resolveFilePath(cover))
+                    }
+                    migrated = true
+                } else {
+                    // File doesn't exist at all — remove this book entry
+                    migrated = true
+                    continue
+                }
+            } else {
+                // Already relative — verify file exists
+                let resolved = resolveFilePath(book.filePath)
+                if !FileManager.default.fileExists(atPath: resolved) {
+                    migrated = true
+                    continue
+                }
+            }
+            
+            result.append(book)
+        }
+        
+        if migrated {
+            // Persist the cleaned-up list
+            if let encoded = try? JSONEncoder().encode(result) {
+                userDefaults.set(encoded, forKey: Keys.books)
+            }
+        }
+        
+        return result
     }
     
     private func saveBooks() {
@@ -76,12 +161,12 @@ class StorageService: ObservableObject {
         books.removeAll { $0.id == book.id }
         
         // Remove associated files
-        let bookURL = URL(fileURLWithPath: book.filePath)
-        try? FileManager.default.removeItem(at: bookURL)
+        let resolvedBookPath = resolveFilePath(book.filePath)
+        try? FileManager.default.removeItem(atPath: resolvedBookPath)
         
         if let coverPath = book.coverImagePath {
-            let coverURL = URL(fileURLWithPath: coverPath)
-            try? FileManager.default.removeItem(at: coverURL)
+            let resolvedCoverPath = resolveFilePath(coverPath)
+            try? FileManager.default.removeItem(atPath: resolvedCoverPath)
         }
         
         saveBooks()

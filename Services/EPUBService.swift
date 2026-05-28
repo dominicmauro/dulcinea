@@ -2,7 +2,7 @@ import Foundation
 import Combine
 import ZIPFoundation
 
-class EPUBService: ObservableObject {
+class EPUBService: ObservableObject, @unchecked Sendable {
     private let storageService: StorageService
     
     init(storageService: StorageService) {
@@ -78,9 +78,9 @@ class EPUBService: ObservableObject {
                 // Create intermediate directories if needed
                 let parentDir = destinationURL.deletingLastPathComponent()
                 try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
-
-                // Extract the entry
-                _ = try archive.extract(entry, to: destinationURL.deletingLastPathComponent())
+                
+                // Extract the entry to its full destination path
+                _ = try archive.extract(entry, to: destinationURL)
             }
         } catch {
             throw EPUBError.extractionFailed
@@ -237,19 +237,85 @@ class EPUBService: ObservableObject {
     // MARK: - HTML Processing
     
     private func extractTextFromHTML(_ html: String) -> String {
-        // Simple HTML tag removal - in production, use a proper HTML parser
-        let pattern = "<[^>]+>"
-        let regex = try? NSRegularExpression(pattern: pattern)
-        let range = NSRange(location: 0, length: html.utf16.count)
-        let text = regex?.stringByReplacingMatches(in: html, options: [], range: range, withTemplate: "")
-        
-        return text?
+        var processed = html
+
+        // Insert paragraph breaks before block-level opening/closing tags
+        // so they survive tag stripping. We use a lookahead-style insertion
+        // by replacing the tag with \n\n + the tag itself (captured via $0).
+        let blockTagPattern = "(</?(?:p|div|br|h[1-6]|li|blockquote|tr)[\\s>/])"
+        if let regex = try? NSRegularExpression(pattern: blockTagPattern, options: .caseInsensitive) {
+            processed = regex.stringByReplacingMatches(
+                in: processed,
+                range: NSRange(location: 0, length: processed.utf16.count),
+                withTemplate: "\n\n$1"
+            )
+        }
+
+        // Strip all HTML tags
+        let tagPattern = "<[^>]+>"
+        if let tagRegex = try? NSRegularExpression(pattern: tagPattern) {
+            processed = tagRegex.stringByReplacingMatches(
+                in: processed,
+                options: [],
+                range: NSRange(location: 0, length: processed.utf16.count),
+                withTemplate: ""
+            )
+        }
+
+        // Decode HTML entities
+        processed = processed
             .replacingOccurrences(of: "&nbsp;", with: " ")
             .replacingOccurrences(of: "&amp;", with: "&")
             .replacingOccurrences(of: "&lt;", with: "<")
             .replacingOccurrences(of: "&gt;", with: ">")
             .replacingOccurrences(of: "&quot;", with: "\"")
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&apos;", with: "'")
+            .replacingOccurrences(of: "&#160;", with: " ")
+
+        // Normalize whitespace:
+        // 1. Replace any single newline (not a paragraph break) with a space
+        // 2. Collapse multiple spaces into one
+        // 3. Preserve paragraph breaks (2+ newlines) as double newlines
+
+        // First, normalize line endings
+        processed = processed.replacingOccurrences(of: "\r\n", with: "\n")
+        processed = processed.replacingOccurrences(of: "\r", with: "\n")
+
+        // Protect paragraph breaks (2+ newlines) with a placeholder
+        if let multiNewlineRegex = try? NSRegularExpression(pattern: "\\n\\s*\\n") {
+            processed = multiNewlineRegex.stringByReplacingMatches(
+                in: processed,
+                range: NSRange(location: 0, length: processed.utf16.count),
+                withTemplate: "\u{FFFC}"  // Object replacement character as placeholder
+            )
+        }
+
+        // Replace remaining single newlines with a space
+        processed = processed.replacingOccurrences(of: "\n", with: " ")
+
+        // Restore paragraph breaks
+        processed = processed.replacingOccurrences(of: "\u{FFFC}", with: "\n\n")
+
+        // Collapse multiple spaces into one
+        if let multiSpaceRegex = try? NSRegularExpression(pattern: " {2,}") {
+            processed = multiSpaceRegex.stringByReplacingMatches(
+                in: processed,
+                range: NSRange(location: 0, length: processed.utf16.count),
+                withTemplate: " "
+            )
+        }
+
+        // Collapse more than 2 consecutive newlines
+        if let excessNewlineRegex = try? NSRegularExpression(pattern: "(\\n){3,}") {
+            processed = excessNewlineRegex.stringByReplacingMatches(
+                in: processed,
+                range: NSRange(location: 0, length: processed.utf16.count),
+                withTemplate: "\n\n"
+            )
+        }
+
+        return processed.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     private func extractChapterTitle(from html: String) -> String? {
@@ -265,6 +331,64 @@ class EPUBService: ObservableObject {
         }
         
         return nil
+    }
+    
+    // MARK: - Cover Image Extraction
+    
+    // In EPUBService.swift, replace the extractCoverImage method with this fixed version:
+
+    func extractCoverImage(from filePath: String) async throws -> Data? {
+        let fileURL = URL(fileURLWithPath: filePath)
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cover_\(UUID().uuidString)")
+        
+        // Ensure clean temporary directory
+        try? FileManager.default.removeItem(at: tempDir)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+        
+        do {
+            // Extract EPUB
+            let archive = try Archive(url: fileURL, accessMode: .read)
+            for entry in archive {
+                let destinationURL = tempDir.appendingPathComponent(entry.path)
+                let parentDir = destinationURL.deletingLastPathComponent()
+                try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
+                _ = try archive.extract(entry, to: destinationURL)
+            }
+            
+            // Parse container and OPF to find cover
+            let containerPath = tempDir.appendingPathComponent("META-INF/container.xml")
+            guard FileManager.default.fileExists(atPath: containerPath.path) else {
+                return nil
+            }
+            
+            let opfPath = try parseContainer(at: containerPath, baseURL: tempDir)
+            let (_, manifest, _) = try parseOPF(at: opfPath)
+            
+            // Look for cover image in manifest
+            let coverItem = manifest.values.first { item in
+                item.properties?.contains("cover-image") == true ||
+                item.id == "cover" ||
+                item.id == "cover-image" ||
+                item.id.lowercased().contains("cover")
+            }
+            
+            guard let coverItem = coverItem else { return nil }
+            
+            let coverURL = opfPath.deletingLastPathComponent().appendingPathComponent(coverItem.href)
+            
+            guard FileManager.default.fileExists(atPath: coverURL.path) else { return nil }
+            
+            return try Data(contentsOf: coverURL)
+            
+        } catch {
+            print("Error extracting cover image: \(error)")
+            return nil
+        }
     }
     
     // MARK: - Book Creation Helper
@@ -283,14 +407,14 @@ class EPUBService: ObservableObject {
         if let coverData = coverData {
             let coverFilename = "\(UUID().uuidString).jpg"
             let coverURL = try storageService.saveCoverImage(coverData, filename: coverFilename)
-            coverImagePath = coverURL.path
+            coverImagePath = storageService.relativePath(for: coverURL.path)
         }
 
         return Book(
             title: content.metadata.title,
             author: content.metadata.author,
             identifier: content.metadata.identifier,
-            filePath: localURL.path,
+            filePath: storageService.relativePath(for: localURL.path),
             coverImagePath: coverImagePath,
             fileSize: Int64(data.count),
             totalChapters: content.chapters.count

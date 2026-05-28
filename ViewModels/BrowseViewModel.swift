@@ -103,8 +103,10 @@ class BrowseViewModel: ObservableObject {
             let state = NavigationState(title: title, url: url, entries: feed.entries)
             navigationStack.append(state)
             
+        } catch let opdsError as OPDSError {
+            errorMessage = opdsError.localizedDescription
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = "Network error: \(error.localizedDescription)"
         }
         
         isLoading = false
@@ -136,12 +138,11 @@ class BrowseViewModel: ObservableObject {
     }
     
     func goToRoot() {
-        guard let catalog = selectedCatalog else { return }
-        
+        selectedCatalog = nil
+        currentFeed = nil
+        currentEntries = []
         navigationStack = []
-        Task {
-            await browseCatalog(catalog)
-        }
+        errorMessage = nil
     }
     
     // MARK: - Search

@@ -164,6 +164,7 @@ class LibraryViewModel: ObservableObject {
         // This extracts title, author, identifier from EPUB metadata and cover image
         let book = try await epubService.createBookFromEPUB(at: url, data: data)
 
+
         storageService.addBook(book)
     }
     
