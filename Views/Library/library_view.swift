@@ -50,6 +50,14 @@ struct LibraryView: View {
             .refreshable {
                 await viewModel.syncProgress()
             }
+            .alert("Error", isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            ), presenting: viewModel.errorMessage) { _ in
+                Button("OK", role: .cancel) { viewModel.errorMessage = nil }
+            } message: { message in
+                Text(message)
+            }
         }
     }
     
@@ -189,6 +197,7 @@ struct EmptyLibraryView: View {
 }
 
 struct ImportBooksSheet: View {
+    @EnvironmentObject var viewModel: LibraryViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showingDocumentPicker = false
     var onImport: (([URL]) -> Void)?
@@ -252,7 +261,8 @@ struct ImportBooksSheet: View {
                 onImport?(urls)
                 dismiss()
             case .failure(let error):
-                print("Import failed: \(error)")
+                viewModel.errorMessage = "Import failed: \(error.localizedDescription)"
+                dismiss()
             }
         }
     }

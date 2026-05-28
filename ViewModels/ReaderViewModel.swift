@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AVFoundation
 
 @MainActor
 class ReaderViewModel: ObservableObject {
@@ -9,7 +10,7 @@ class ReaderViewModel: ObservableObject {
     @Published var chapters: [EPUBChapter] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
-    
+
     // Reading settings
     @Published var fontSize: Double = 16
     @Published var fontFamily: FontFamily = .systemDefault
@@ -17,7 +18,7 @@ class ReaderViewModel: ObservableObject {
     @Published var textColor: TextColor = .black
     @Published var lineSpacing: Double = 1.2
     @Published var margin: Double = 20
-    
+
     // Reading state
     @Published var isMenuVisible = false
     @Published var isSettingsVisible = false
@@ -45,17 +46,25 @@ class ReaderViewModel: ObservableObject {
         self.storageService = storageService
 
 
+        speechDelegate = SpeechDelegate { [weak self] in
+            Task { @MainActor in
+                self?.isSpeaking = false
+            }
+        }
+        speechSynthesizer.delegate = speechDelegate
+
         loadReadingSettings()
         setupProgressTracking()
         setupSettingsObservers()
     }
 
     deinit {
-        // Clean up timers to prevent memory leaks
+        // Clean up timers and speech to prevent memory leaks
         progressTimer?.invalidate()
         progressTimer = nil
         progressSaveTask?.cancel()
         progressSaveTask = nil
+        speechSynthesizer.stopSpeaking(at: .immediate)
     }
     
     // MARK: - Book Loading
@@ -64,7 +73,7 @@ class ReaderViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         currentBook = book
-        
+
         do {
             let resolvedPath = storageService.resolveFilePath(book.filePath)
             let bookContent = try await epubService.loadEPUB(from: resolvedPath)
@@ -78,18 +87,21 @@ class ReaderViewModel: ObservableObject {
                 restorePageFromPosition()
             }
             updateReadingProgress()
-            
+
+            // Load bookmarks for this book
+            loadBookmarks()
+
             // Mark book as opened
             var openedBook = book
             openedBook.markAsOpened()
             await updateBookProgress(openedBook)
-            
+
             startReadingSession()
-            
+
         } catch {
             errorMessage = error.localizedDescription
         }
-        
+
         isLoading = false
     }
     
@@ -369,14 +381,180 @@ class ReaderViewModel: ObservableObject {
         isSettingsVisible = false
     }
     
-    // MARK: - Text-to-Speech (Future Feature)
-    
-    @Published var isSpeaking = false
-    @Published var speechRate: Float = 0.5
-    
+    // MARK: - Text-to-Speech
+
     func toggleSpeech() {
-        // TODO: Implement text-to-speech
-        isSpeaking.toggle()
+        if isSpeaking {
+            stopSpeaking()
+        } else {
+            startSpeaking()
+        }
+    }
+
+    func startSpeaking() {
+        guard !chapters.isEmpty, currentChapter < chapters.count else { return }
+
+        let chapter = chapters[currentChapter]
+        let utterance = AVSpeechUtterance(string: chapter.content)
+        utterance.rate = speechRate
+        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+
+        speechSynthesizer.speak(utterance)
+        isSpeaking = true
+    }
+
+    func stopSpeaking() {
+        speechSynthesizer.stopSpeaking(at: .immediate)
+        isSpeaking = false
+    }
+
+    func setSpeechRate(_ rate: Float) {
+        speechRate = max(0.0, min(1.0, rate))
+        // If currently speaking, restart with new rate
+        if isSpeaking {
+            stopSpeaking()
+            startSpeaking()
+        }
+    }
+
+    // MARK: - Bookmarks
+
+    func addBookmark(note: String? = nil) {
+        guard let book = currentBook else { return }
+
+        let bookmark = Bookmark(
+            bookId: book.id,
+            chapterIndex: currentChapter,
+            position: currentPosition,
+            chapterTitle: chapters.isEmpty ? "Chapter \(currentChapter + 1)" : chapters[currentChapter].title,
+            note: note
+        )
+
+        bookmarks.append(bookmark)
+        saveBookmarks()
+    }
+
+    func removeBookmark(_ bookmark: Bookmark) {
+        bookmarks.removeAll { $0.id == bookmark.id }
+        saveBookmarks()
+    }
+
+    func goToBookmark(_ bookmark: Bookmark) {
+        goToChapter(bookmark.chapterIndex)
+        currentPosition = bookmark.position
+        updateReadingProgress()
+        hideBookmarks()
+    }
+
+    func loadBookmarks() {
+        guard let book = currentBook else {
+            bookmarks = []
+            return
+        }
+
+        let defaults = UserDefaults.standard
+        let key = "bookmarks_\(book.id.uuidString)"
+
+        if let data = defaults.data(forKey: key),
+           let decoded = try? JSONDecoder().decode([Bookmark].self, from: data) {
+            bookmarks = decoded
+        } else {
+            bookmarks = []
+        }
+    }
+
+    private func saveBookmarks() {
+        guard let book = currentBook else { return }
+
+        let defaults = UserDefaults.standard
+        let key = "bookmarks_\(book.id.uuidString)"
+
+        if let encoded = try? JSONEncoder().encode(bookmarks) {
+            defaults.set(encoded, forKey: key)
+        }
+    }
+
+    func showBookmarks() {
+        isBookmarksVisible = true
+    }
+
+    func hideBookmarks() {
+        isBookmarksVisible = false
+    }
+
+    func hasBookmarkAtCurrentPosition() -> Bool {
+        bookmarks.contains { $0.chapterIndex == currentChapter && abs($0.position - currentPosition) < 0.01 }
+    }
+
+    // MARK: - Share
+
+    func getShareContent() -> String? {
+        guard let book = currentBook, !chapters.isEmpty, currentChapter < chapters.count else {
+            return nil
+        }
+
+        let chapter = chapters[currentChapter]
+        let excerpt = String(chapter.content.prefix(500))
+
+        return """
+        📖 \(book.title) by \(book.author)
+
+        Chapter: \(chapter.title)
+
+        "\(excerpt)..."
+
+        Shared from Dulcinea
+        """
+    }
+
+    func getShareItems() -> [Any] {
+        var items: [Any] = []
+
+        if let shareContent = getShareContent() {
+            items.append(shareContent)
+        }
+
+        return items
+    }
+}
+
+// MARK: - Speech Delegate
+
+private class SpeechDelegate: NSObject, AVSpeechSynthesizerDelegate {
+    private let onFinish: () -> Void
+
+    init(onFinish: @escaping () -> Void) {
+        self.onFinish = onFinish
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        onFinish()
+    }
+
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        onFinish()
+    }
+}
+
+// MARK: - Bookmark Model
+
+struct Bookmark: Identifiable, Codable {
+    let id: UUID
+    let bookId: UUID
+    let chapterIndex: Int
+    let position: Double
+    let chapterTitle: String
+    let note: String?
+    let dateCreated: Date
+
+    init(bookId: UUID, chapterIndex: Int, position: Double, chapterTitle: String, note: String? = nil) {
+        self.id = UUID()
+        self.bookId = bookId
+        self.chapterIndex = chapterIndex
+        self.position = position
+        self.chapterTitle = chapterTitle
+        self.note = note
+        self.dateCreated = Date()
     }
 }
 

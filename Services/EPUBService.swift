@@ -10,14 +10,14 @@ class EPUBService: ObservableObject, @unchecked Sendable {
     }
     
     // MARK: - EPUB Loading and Parsing
-    
+
     func loadEPUB(from filePath: String) async throws -> EPUBContent {
         let fileURL = URL(fileURLWithPath: filePath)
-        
+
         guard FileManager.default.fileExists(atPath: filePath) else {
             throw EPUBError.fileNotFound
         }
-        
+
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
@@ -29,26 +29,52 @@ class EPUBService: ObservableObject, @unchecked Sendable {
             }
         }
     }
-    
+
+    /// Parse EPUB and extract content along with cover image in a single pass
+    func loadEPUBWithCover(from filePath: String) async throws -> (content: EPUBContent, coverData: Data?) {
+        let fileURL = URL(fileURLWithPath: filePath)
+
+        guard FileManager.default.fileExists(atPath: filePath) else {
+            throw EPUBError.fileNotFound
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let result = try self.parseEPUBFileWithCover(at: fileURL)
+                    continuation.resume(returning: result)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     private func parseEPUBFile(at url: URL) throws -> EPUBContent {
+        let (content, _) = try parseEPUBFileWithCover(at: url)
+        return content
+    }
+
+    /// Single-pass extraction that returns both content and cover image
+    private func parseEPUBFileWithCover(at url: URL) throws -> (content: EPUBContent, coverData: Data?) {
         // Create unique temporary directory for extraction
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("epub_\(UUID().uuidString)")
-        
+
         // Ensure the directory doesn't exist and create it
         try? FileManager.default.removeItem(at: tempDir)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        
+
         defer {
             try? FileManager.default.removeItem(at: tempDir)
         }
-        
+
         // Extract EPUB (it's a ZIP file)
         do {
             let archive = try Archive(url: url, accessMode: .read)
             for entry in archive {
                 let destinationURL = tempDir.appendingPathComponent(entry.path)
-                
+
                 // Create intermediate directories if needed
                 let parentDir = destinationURL.deletingLastPathComponent()
                 try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
@@ -59,29 +85,53 @@ class EPUBService: ObservableObject, @unchecked Sendable {
         } catch {
             throw EPUBError.extractionFailed
         }
-        
+
         // Parse container.xml to find OPF file
         let containerPath = tempDir.appendingPathComponent("META-INF/container.xml")
         guard FileManager.default.fileExists(atPath: containerPath.path) else {
             throw EPUBError.invalidContainer
         }
-        
+
         let opfPath = try parseContainer(at: containerPath, baseURL: tempDir)
-        
+
         // Parse OPF file for metadata and manifest
         let (metadata, manifest, spine) = try parseOPF(at: opfPath)
-        
+
         // Extract chapters from spine
         let chapters = try extractChapters(from: spine, manifest: manifest, baseURL: opfPath.deletingLastPathComponent())
-        
+
         // Generate table of contents
         let tableOfContents = try generateTableOfContents(from: manifest, baseURL: opfPath.deletingLastPathComponent())
-        
-        return EPUBContent(
+
+        // Extract cover image while we still have the extracted files
+        let coverData = extractCoverImageFromManifest(manifest: manifest, baseURL: opfPath.deletingLastPathComponent())
+
+        let content = EPUBContent(
             metadata: metadata,
             chapters: chapters,
             tableOfContents: tableOfContents
         )
+
+        return (content, coverData)
+    }
+
+    /// Extract cover image from already-extracted EPUB files
+    private func extractCoverImageFromManifest(manifest: [String: ManifestItem], baseURL: URL) -> Data? {
+        // Look for cover image in manifest
+        let coverItem = manifest.values.first { item in
+            item.properties?.contains("cover-image") == true ||
+            item.id == "cover" ||
+            item.id == "cover-image" ||
+            item.id.lowercased().contains("cover")
+        }
+
+        guard let coverItem = coverItem else { return nil }
+
+        let coverURL = baseURL.appendingPathComponent(coverItem.href)
+
+        guard FileManager.default.fileExists(atPath: coverURL.path) else { return nil }
+
+        return try? Data(contentsOf: coverURL)
     }
     
     // MARK: - Container Parsing
@@ -342,23 +392,24 @@ class EPUBService: ObservableObject, @unchecked Sendable {
     }
     
     // MARK: - Book Creation Helper
-    
+
+    /// Create a Book from an EPUB file using single-pass extraction for efficiency
     func createBookFromEPUB(at url: URL, data: Data) async throws -> Book {
         // Save EPUB file
         let filename = url.lastPathComponent
         let localURL = try storageService.saveEPUBFile(data, filename: filename)
-        
-        // Extract metadata
-        let content = try await loadEPUB(from: localURL.path)
-        
-        // Extract and save cover image
+
+        // Extract metadata and cover in a single pass (no duplicate extraction)
+        let (content, coverData) = try await loadEPUBWithCover(from: localURL.path)
+
+        // Save cover image if present
         var coverImagePath: String?
-        if let coverData = try await extractCoverImage(from: localURL.path) {
+        if let coverData = coverData {
             let coverFilename = "\(UUID().uuidString).jpg"
             let coverURL = try storageService.saveCoverImage(coverData, filename: coverFilename)
             coverImagePath = storageService.relativePath(for: coverURL.path)
         }
-        
+
         return Book(
             title: content.metadata.title,
             author: content.metadata.author,
