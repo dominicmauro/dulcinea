@@ -479,14 +479,14 @@ struct Bookmark: Identifiable, Codable {
     let note: String?
     let dateCreated: Date
 
-    init(bookId: UUID, chapterIndex: Int, position: Double, chapterTitle: String, note: String? = nil) {
+    init(bookId: UUID, chapterIndex: Int, position: Double, chapterTitle: String, note: String? = nil, dateCreated: Date = Date()) {
         self.id = UUID()
         self.bookId = bookId
         self.chapterIndex = chapterIndex
         self.position = position
         self.chapterTitle = chapterTitle
         self.note = note
-        self.dateCreated = Date()
+        self.dateCreated = dateCreated
     }
 }
 
@@ -498,17 +498,21 @@ enum FontFamily: String, CaseIterable {
     case sansSerif = "Helvetica"
     case monospace = "Courier"
     case dyslexic = "OpenDyslexic"
-    
+    case georgia = "Georgia"
+    case palatino = "Palatino"
+
     var displayName: String {
         switch self {
-        case .systemDefault: return "System Default"
+        case .systemDefault: return "System"
         case .serif: return "Serif"
         case .sansSerif: return "Sans Serif"
         case .monospace: return "Monospace"
         case .dyslexic: return "Dyslexic Friendly"
+        case .georgia: return "Georgia"
+        case .palatino: return "Palatino"
         }
     }
-    
+
     var fontName: String {
         switch self {
         case .systemDefault: return "system"
@@ -516,6 +520,8 @@ enum FontFamily: String, CaseIterable {
         case .sansSerif: return "Helvetica"
         case .monospace: return "Courier"
         case .dyslexic: return "OpenDyslexic-Regular"
+        case .georgia: return "Georgia"
+        case .palatino: return "Palatino"
         }
     }
 }
