@@ -34,6 +34,7 @@ struct ContentView: View {
                 .tag(AppCoordinator.Tab.browse)
             
             SettingsView()
+                .environmentObject(coordinator.settingsViewModel)
                 .tabItem {
                     Image(systemName: "gearshape")
                     Text("Settings")

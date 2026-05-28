@@ -199,7 +199,9 @@ class StorageService: ObservableObject {
             serverURL: credentials.serverURL,
             username: credentials.username,
             password: credentials.password,
-            deviceName: settings.deviceName
+            deviceName: settings.deviceName,
+            syncInterval: settings.syncInterval,
+            autoSync: settings.autoSync
         )
     }
 

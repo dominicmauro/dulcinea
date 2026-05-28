@@ -79,8 +79,9 @@ class EPUBService: ObservableObject {
                 let parentDir = destinationURL.deletingLastPathComponent()
                 try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
 
-                // Extract the entry
-                _ = try archive.extract(entry, to: destinationURL.deletingLastPathComponent())
+                // Extract the entry to its full destination path (not the parent
+                // directory — `extract(_:to:)` expects the destination file URL).
+                _ = try archive.extract(entry, to: destinationURL)
             }
         } catch {
             throw EPUBError.extractionFailed

@@ -89,7 +89,9 @@ class SettingsViewModel: ObservableObject {
             serverURL: serverURL,
             username: username,
             password: password,
-            deviceName: deviceName
+            deviceName: deviceName,
+            syncInterval: syncInterval.rawValue,
+            autoSync: autoSync
         )
         
         do {
@@ -106,19 +108,15 @@ class SettingsViewModel: ObservableObject {
     }
     
     func saveSyncConfiguration(_ config: SyncConfiguration? = nil) {
-        let configToSave = config ?? SyncConfiguration(
+        // When no explicit config is passed, build one from the current form
+        // state so the user's auto-sync toggle and interval are preserved.
+        let finalConfig = config ?? SyncConfiguration(
             serverURL: serverURL,
             username: username,
             password: password,
-            deviceName: deviceName
-        )
-
-        var finalConfig = configToSave
-        finalConfig = SyncConfiguration(
-            serverURL: finalConfig.serverURL,
-            username: finalConfig.username,
-            password: finalConfig.password,
-            deviceName: finalConfig.deviceName
+            deviceName: deviceName,
+            syncInterval: syncInterval.rawValue,
+            autoSync: autoSync
         )
 
         do {

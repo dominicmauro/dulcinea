@@ -38,6 +38,7 @@ class ReaderViewModel: ObservableObject {
 
     private let epubService: EPUBService
     private let syncService: KOSyncService
+    private let storageService: StorageService
     private var cancellables = Set<AnyCancellable>()
     private var progressTimer: Timer?
     private var readingStartTime: Date?
@@ -47,9 +48,10 @@ class ReaderViewModel: ObservableObject {
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var speechDelegate: SpeechDelegate?
 
-    init(epubService: EPUBService, syncService: KOSyncService) {
+    init(epubService: EPUBService, syncService: KOSyncService, storageService: StorageService) {
         self.epubService = epubService
         self.syncService = syncService
+        self.storageService = storageService
 
         speechDelegate = SpeechDelegate { [weak self] in
             Task { @MainActor in
@@ -214,13 +216,9 @@ class ReaderViewModel: ObservableObject {
     }
     
     private func updateBookProgress(_ book: Book) async {
-        // This would typically go through a storage service
-        // For now, we'll emit this as a notification that can be caught by LibraryViewModel
-        NotificationCenter.default.post(
-            name: .bookProgressUpdated,
-            object: nil,
-            userInfo: ["book": book]
-        )
+        // Persist directly to storage. StorageService publishes `books`, so
+        // LibraryViewModel picks up the change automatically.
+        storageService.updateBook(book)
     }
     
     // MARK: - Reading Session Tracking

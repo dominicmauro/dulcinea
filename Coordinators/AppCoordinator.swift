@@ -13,6 +13,7 @@ class AppCoordinator: ObservableObject {
     let libraryViewModel: LibraryViewModel
     let readerViewModel: ReaderViewModel
     let browseViewModel: BrowseViewModel
+    let settingsViewModel: SettingsViewModel
     
     // Services
     private let epubService: EPUBService
@@ -36,11 +37,16 @@ class AppCoordinator: ObservableObject {
         )
         self.readerViewModel = ReaderViewModel(
             epubService: epubService,
-            syncService: syncService
+            syncService: syncService,
+            storageService: storageService
         )
         self.browseViewModel = BrowseViewModel(
             opdsService: opdsService,
             storageService: storageService
+        )
+        self.settingsViewModel = SettingsViewModel(
+            storageService: storageService,
+            syncService: syncService
         )
     }
     

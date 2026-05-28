@@ -790,6 +790,6 @@ struct ShareSheet: UIViewControllerRepresentable {
         filePath: "/path/to/book.epub",
         fileSize: 1024000
     ))
-    .environmentObject(ReaderViewModel(epubService: EPUBService(storageService: StorageService()), syncService: KOSyncService()))
+    .environmentObject(ReaderViewModel(epubService: EPUBService(storageService: StorageService()), syncService: KOSyncService(), storageService: StorageService()))
     .environmentObject(AppCoordinator())
 }
