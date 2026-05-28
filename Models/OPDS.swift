@@ -87,6 +87,16 @@ struct OPDSCatalog: Identifiable, Codable {
         self.isEnabled = true
         self.lastUpdated = nil
     }
+
+    init(id: UUID, name: String, url: String, username: String? = nil, password: String? = nil, isEnabled: Bool = true, lastUpdated: Date? = nil) {
+        self.id = id
+        self.name = name
+        self.url = url
+        self.username = username
+        self.password = password
+        self.isEnabled = isEnabled
+        self.lastUpdated = lastUpdated
+    }
     
     var requiresAuthentication: Bool {
         return username != nil && password != nil

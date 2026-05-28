@@ -689,12 +689,15 @@ struct EditCatalogSheet: View {
     
     private func saveCatalog() {
         let updatedCatalog = OPDSCatalog(
+            id: catalog.id,
             name: name,
             url: url,
             username: requiresAuth ? username : nil,
-            password: requiresAuth ? password : nil
+            password: requiresAuth ? password : nil,
+            isEnabled: catalog.isEnabled,
+            lastUpdated: catalog.lastUpdated
         )
-        
+
         onSave(updatedCatalog)
         dismiss()
     }

@@ -72,12 +72,14 @@ class BrowseViewModel: ObservableObject {
     }
     
     func toggleCatalogEnabled(_ catalog: OPDSCatalog) {
-        var updatedCatalog = catalog
-        updatedCatalog = OPDSCatalog(
-            name: updatedCatalog.name,
-            url: updatedCatalog.url,
-            username: updatedCatalog.username,
-            password: updatedCatalog.password
+        let updatedCatalog = OPDSCatalog(
+            id: catalog.id,
+            name: catalog.name,
+            url: catalog.url,
+            username: catalog.username,
+            password: catalog.password,
+            isEnabled: !catalog.isEnabled,
+            lastUpdated: catalog.lastUpdated
         )
         storageService.updateCatalog(updatedCatalog)
     }
