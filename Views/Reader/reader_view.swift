@@ -39,6 +39,11 @@ struct ReaderView: View {
             if viewModel.isBookmarksVisible {
                 bookmarksOverlay
             }
+
+            // Table of Contents overlay
+            if viewModel.isContentsVisible {
+                contentsOverlay
+            }
         }
         .sheet(isPresented: $showingShareSheet) {
             if let shareContent = viewModel.getShareContent() {
@@ -243,7 +248,7 @@ struct ReaderView: View {
                     .accessibilityHint(viewModel.currentChapter > 0 ? "Go to chapter \(viewModel.currentChapter)" : "Already at first chapter")
 
                     Button("Contents") {
-                        // Show table of contents
+                        viewModel.showContents()
                     }
                     .foregroundColor(.white)
                     .accessibilityLabel("Table of contents")
@@ -612,6 +617,107 @@ struct ReaderView: View {
                 .background(Color(.systemBackground))
                 .cornerRadius(20)
                 .padding(.horizontal)
+            }
+        }
+    }
+
+    // MARK: - Table of Contents Overlay
+
+    private var contentsOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    viewModel.hideContents()
+                }
+
+            VStack(spacing: 0) {
+                Spacer()
+
+                VStack(spacing: 0) {
+                    // Header
+                    HStack {
+                        Text("Contents")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .accessibilityAddTraits(.isHeader)
+
+                        Spacer()
+
+                        Button("Done") {
+                            viewModel.hideContents()
+                        }
+                        .fontWeight(.medium)
+                        .accessibilityLabel("Close table of contents")
+                    }
+                    .padding()
+
+                    Divider()
+
+                    if viewModel.tableOfContents.isEmpty {
+                        VStack(spacing: 15) {
+                            Image(systemName: "list.bullet")
+                                .font(.system(size: 40))
+                                .foregroundColor(.gray)
+                                .accessibilityHidden(true)
+
+                            Text("No Contents")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+
+                            Text("This book doesn't have a table of contents")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                        .padding(.vertical, 40)
+                    } else {
+                        List {
+                            ForEach(viewModel.tableOfContents) { entry in
+                                tocEntryRow(entry)
+                            }
+                        }
+                        .listStyle(PlainListStyle())
+                        .frame(maxHeight: 400)
+                    }
+                }
+                .background(Color(.systemBackground))
+                .cornerRadius(20)
+                .padding(.horizontal)
+            }
+        }
+    }
+
+    private func tocEntryRow(_ entry: TOCEntry) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: {
+                viewModel.goToTOCEntry(entry)
+            }) {
+                HStack {
+                    Text(entry.title)
+                        .font(.body)
+                        .foregroundColor(.primary)
+                        .lineLimit(2)
+
+                    Spacer()
+
+                    if entry.chapterIndex == viewModel.currentChapter {
+                        Image(systemName: "checkmark")
+                            .foregroundColor(.blue)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .padding(.leading, CGFloat(entry.level - 1) * 20)
+                .padding(.vertical, 8)
+            }
+            .accessibilityLabel(entry.title)
+            .accessibilityHint(entry.chapterIndex == viewModel.currentChapter ? "Current chapter" : "Double tap to go to this chapter")
+            .accessibilityAddTraits(entry.chapterIndex == viewModel.currentChapter ? [.isSelected] : [])
+
+            // Render children recursively
+            ForEach(entry.children) { child in
+                tocEntryRow(child)
             }
         }
     }

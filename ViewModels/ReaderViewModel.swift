@@ -32,6 +32,10 @@ class ReaderViewModel: ObservableObject {
     @Published var bookmarks: [Bookmark] = []
     @Published var isBookmarksVisible = false
 
+    // Table of Contents
+    @Published var tableOfContents: [TOCEntry] = []
+    @Published var isContentsVisible = false
+
     private let epubService: EPUBService
     private let syncService: KOSyncService
     private var cancellables = Set<AnyCancellable>()
@@ -80,6 +84,15 @@ class ReaderViewModel: ObservableObject {
             currentChapter = book.currentChapter
             currentPosition = book.currentPosition
             updateReadingProgress()
+
+            // Load table of contents (fall back to chapter list if empty)
+            if bookContent.tableOfContents.isEmpty {
+                tableOfContents = chapters.enumerated().map { index, chapter in
+                    TOCEntry(title: chapter.title, chapterIndex: index, level: 1, children: [])
+                }
+            } else {
+                tableOfContents = bookContent.tableOfContents
+            }
 
             // Load bookmarks for this book
             loadBookmarks()
@@ -381,6 +394,27 @@ class ReaderViewModel: ObservableObject {
 
     func hasBookmarkAtCurrentPosition() -> Bool {
         bookmarks.contains { $0.chapterIndex == currentChapter && abs($0.position - currentPosition) < 0.01 }
+    }
+
+    // MARK: - Table of Contents
+
+    func showContents() {
+        isContentsVisible = true
+    }
+
+    func hideContents() {
+        isContentsVisible = false
+    }
+
+    func goToTOCEntry(_ entry: TOCEntry) {
+        let targetChapter = min(entry.chapterIndex, chapters.count - 1)
+        if targetChapter >= 0 {
+            currentChapter = targetChapter
+            currentPosition = 0.0
+            updateReadingProgress()
+            saveProgress()
+        }
+        hideContents()
     }
 
     // MARK: - Share
