@@ -112,7 +112,7 @@ class SettingsViewModel: ObservableObject {
             password: password,
             deviceName: deviceName
         )
-        
+
         var finalConfig = configToSave
         finalConfig = SyncConfiguration(
             serverURL: finalConfig.serverURL,
@@ -120,12 +120,16 @@ class SettingsViewModel: ObservableObject {
             password: finalConfig.password,
             deviceName: finalConfig.deviceName
         )
-        
-        storageService.saveSyncConfiguration(finalConfig)
-        syncConfiguration = finalConfig
-        
-        // Update sync service
-        syncService.configure(with: finalConfig)
+
+        do {
+            try storageService.saveSyncConfiguration(finalConfig)
+            syncConfiguration = finalConfig
+
+            // Update sync service
+            syncService.configure(with: finalConfig)
+        } catch {
+            errorMessage = "Failed to save sync configuration: \(error.localizedDescription)"
+        }
     }
     
     func removeSyncConfiguration() {

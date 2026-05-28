@@ -4,11 +4,14 @@ import Combine
 class KOSyncService: ObservableObject {
     @Published var status: SyncStatus = .notConfigured
     @Published var isConfigured = false
-    
+
     private var configuration: SyncConfiguration?
     private let urlSession: URLSession
     private var syncTimer: Timer?
-    
+
+    /// Callback invoked when auto-sync timer fires. Set by the view model to perform actual sync.
+    var onAutoSyncRequested: (() async -> Void)?
+
     private var isSyncing: Bool {
         switch status {
         case .syncing:
@@ -286,10 +289,11 @@ class KOSyncService: ObservableObject {
     
     private func performAutoSync() async {
         guard isConfigured, !isSyncing else { return }
-        // Get books that need syncing from storage
-        // This would typically come from a storage service
-        // For now, we'll emit a notification requesting sync
-        NotificationCenter.default.post(name: .autoSyncRequested, object: nil)
+
+        // Invoke the callback if set (typically by LibraryViewModel)
+        if let onAutoSyncRequested = onAutoSyncRequested {
+            await onAutoSyncRequested()
+        }
     }
     
     // MARK: - Reading Session Tracking
@@ -423,7 +427,6 @@ struct ReadingStatistics: Codable {
 
 extension Notification.Name {
     static let syncProgressUpdated = Notification.Name("syncProgressUpdated")
-    static let autoSyncRequested = Notification.Name("autoSyncRequested")
     static let readingSessionStarted = Notification.Name("readingSessionStarted")
     static let readingSessionEnded = Notification.Name("readingSessionEnded")
 }

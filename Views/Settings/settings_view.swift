@@ -56,9 +56,17 @@ struct SettingsView: View {
                     viewModel.errorMessage = "Import failed: \(error.localizedDescription)"
                 }
             }
+            .alert("Error", isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            ), presenting: viewModel.errorMessage) { _ in
+                Button("OK", role: .cancel) { viewModel.errorMessage = nil }
+            } message: { message in
+                Text(message)
+            }
         }
     }
-    
+
     // MARK: - Sync Section
     
     private var syncSection: some View {

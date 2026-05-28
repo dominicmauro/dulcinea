@@ -160,18 +160,13 @@ class StorageService: ObservableObject {
     // MARK: - Sync Configuration
 
     /// Save sync configuration with credentials stored securely in Keychain
-    func saveSyncConfiguration(_ config: SyncConfiguration) {
+    func saveSyncConfiguration(_ config: SyncConfiguration) throws {
         // Store sensitive credentials in Keychain
-        do {
-            try keychainService.saveSyncCredentials(
-                serverURL: config.serverURL,
-                username: config.username,
-                password: config.password
-            )
-        } catch {
-            print("Failed to save sync credentials to Keychain: \(error)")
-            return
-        }
+        try keychainService.saveSyncCredentials(
+            serverURL: config.serverURL,
+            username: config.username,
+            password: config.password
+        )
 
         // Store non-sensitive settings in UserDefaults
         let settings = SyncSettings(

@@ -12,6 +12,7 @@ class LibraryViewModel: ObservableObject {
     private let epubService: EPUBService
     private let syncService: KOSyncService
     private var cancellables = Set<AnyCancellable>()
+    private var syncFailureCount = 0
 
     init(storageService: StorageService, epubService: EPUBService, syncService: KOSyncService) {
         self.storageService = storageService
@@ -19,21 +20,29 @@ class LibraryViewModel: ObservableObject {
         self.syncService = syncService
 
         setupBindings()
+        setupAutoSync()
         loadBooks()
     }
-    
+
     private func setupBindings() {
         // Listen to storage service for book updates
         storageService.$books
             .receive(on: DispatchQueue.main)
             .assign(to: \.books, on: self)
             .store(in: &cancellables)
-        
+
         // Listen to sync service status
         syncService.$status
             .receive(on: DispatchQueue.main)
             .assign(to: \.syncStatus, on: self)
             .store(in: &cancellables)
+    }
+
+    private func setupAutoSync() {
+        // Wire up auto-sync callback so the sync service can trigger syncs
+        syncService.onAutoSyncRequested = { [weak self] in
+            await self?.syncProgress()
+        }
     }
     
     // MARK: - Public Methods
@@ -98,17 +107,22 @@ class LibraryViewModel: ObservableObject {
     
     private func syncBookProgress(_ book: Book) async {
         guard syncService.isConfigured else { return }
-        
+
         do {
             try await syncService.uploadProgress(for: book)
-            
+
             var syncedBook = book
             syncedBook.markAsSynced()
             storageService.updateBook(syncedBook)
-            
+            syncFailureCount = 0
+
         } catch {
-            // Silent fail for individual book sync - user can manually sync later
-            print("Failed to sync progress for \(book.title): \(error)")
+            syncFailureCount += 1
+            // Surface error after repeated failures to avoid noise from transient issues
+            if syncFailureCount >= 3 {
+                errorMessage = "Sync failing: \(error.localizedDescription)"
+                syncFailureCount = 0
+            }
         }
     }
     

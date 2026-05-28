@@ -8,9 +8,13 @@ struct OPDSFeed: Codable {
     let updated: Date
     let entries: [OPDSEntry]
     let links: [OPDSLink]
-    
+
     enum CodingKeys: String, CodingKey {
         case id, title, updated, entries, links
+    }
+
+    var searchLink: OPDSLink? {
+        links.first { $0.isSearch }
     }
 }
 
@@ -51,13 +55,17 @@ struct OPDSLink: Codable {
     let type: String?
     let rel: String?
     let title: String?
-    
+
     var isAcquisition: Bool {
         rel?.contains("http://opds-spec.org/acquisition") == true
     }
-    
+
     var isNavigation: Bool {
         type?.contains("application/atom+xml") == true
+    }
+
+    var isSearch: Bool {
+        rel == "search" || rel?.contains("opensearch") == true
     }
 }
 

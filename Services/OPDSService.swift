@@ -5,7 +5,8 @@ class OPDSService: ObservableObject {
     private let storageService: StorageService
     private let urlSession: URLSession
     private var downloadTasks: [String: URLSessionDownloadTask] = [:]
-    
+    private var catalogSearchURLs: [UUID: String] = [:]
+
     init(storageService: StorageService) {
         self.storageService = storageService
         
@@ -49,27 +50,35 @@ class OPDSService: ObservableObject {
             throw OPDSError.serverError(httpResponse.statusCode)
         }
         
-        return try parseFeed(from: data, baseURL: feedURL)
+        let feed = try parseFeed(from: data, baseURL: feedURL)
+
+        // Cache search URL if present in feed links
+        if let catalog = catalog, let searchLink = feed.searchLink {
+            let resolvedSearchURL = URL(string: searchLink.href, relativeTo: feedURL)?.absoluteString ?? searchLink.href
+            catalogSearchURLs[catalog.id] = resolvedSearchURL
+        }
+
+        return feed
     }
-    
+
     private func parseFeed(from data: Data, baseURL: URL) throws -> OPDSFeed {
         let parser = XMLParser(data: data)
         let delegate = OPDSFeedParserDelegate(baseURL: baseURL)
         parser.delegate = delegate
-        
+
         guard parser.parse() else {
             throw OPDSError.parsingFailed
         }
-        
+
         guard let feed = delegate.feed else {
             throw OPDSError.invalidFeed
         }
-        
+
         return feed
     }
-    
+
     // MARK: - Search
-    
+
     func searchCatalog(_ catalog: OPDSCatalog, query: String) async throws -> [OPDSEntry] {
         // Most OPDS feeds support OpenSearch
         let searchURL = try constructSearchURL(for: catalog, query: query)
@@ -78,16 +87,28 @@ class OPDSService: ObservableObject {
     }
     
     private func constructSearchURL(for catalog: OPDSCatalog, query: String) throws -> String {
-        // Try common search patterns
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        
+
+        // Use cached search URL if available (detected from feed's search link)
+        if let cachedSearchURL = catalogSearchURLs[catalog.id] {
+            // OpenSearch templates use {searchTerms} placeholder
+            if cachedSearchURL.contains("{searchTerms}") {
+                return cachedSearchURL.replacingOccurrences(of: "{searchTerms}", with: encodedQuery)
+            }
+            // Some feeds use a direct search endpoint
+            if cachedSearchURL.contains("?") {
+                return "\(cachedSearchURL)&q=\(encodedQuery)"
+            }
+            return "\(cachedSearchURL)?q=\(encodedQuery)"
+        }
+
+        // Fall back to common search patterns
         let searchPatterns = [
             "\(catalog.url)/search?q=\(encodedQuery)",
-            "\(catalog.url)/search.xml?query=\(encodedQuery)",
-            "\(catalog.url)?search=\(encodedQuery)"
+            "\(catalog.url)/opensearch?query=\(encodedQuery)",
+            "\(catalog.url)/search.xml?query=\(encodedQuery)"
         ]
-        
-        // For now, use the first pattern - in production, you'd detect the search capability from the feed
+
         return searchPatterns[0]
     }
     
@@ -142,19 +163,25 @@ class OPDSService: ObservableObject {
                     // Move file to permanent location
                     let data = try Data(contentsOf: localURL)
                     let filename = self?.generateFilename(from: entry, response: httpResponse) ?? "book.epub"
-                    let permanentURL = try self?.storageService.saveEPUBFile(data, filename: filename)
-                    
+
+                    guard let storageService = self?.storageService else {
+                        continuation.resume(throwing: OPDSError.downloadFailed(URLError(.unknown)))
+                        return
+                    }
+
+                    let permanentURL = try storageService.saveEPUBFile(data, filename: filename)
+
                     // Create book object
                     let book = Book(
                         title: entry.title,
                         author: entry.authorNames,
                         identifier: entry.id,
-                        filePath: permanentURL?.path ?? "",
+                        filePath: permanentURL.path,
                         fileSize: Int64(data.count)
                     )
-                    
-                    continuation.resume(returning: (permanentURL!, book))
-                    
+
+                    continuation.resume(returning: (permanentURL, book))
+
                 } catch {
                     continuation.resume(throwing: OPDSError.downloadFailed(error))
                 }

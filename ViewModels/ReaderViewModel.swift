@@ -200,14 +200,15 @@ class ReaderViewModel: ObservableObject {
         
         await updateBookProgress(updatedBook)
         
-        // Sync with KOSync if configured
+        // Sync with KOSync if configured (non-blocking, doesn't interrupt reading)
         if syncService.isConfigured {
             do {
                 try await syncService.uploadProgress(for: updatedBook)
                 updatedBook.markAsSynced()
                 await updateBookProgress(updatedBook)
             } catch {
-                print("Failed to sync progress: \(error)")
+                // Set error message for UI to optionally display, but don't interrupt reading
+                errorMessage = "Sync failed: \(error.localizedDescription)"
             }
         }
     }
