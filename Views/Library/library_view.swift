@@ -42,9 +42,18 @@ struct LibraryView: View {
             .searchable(text: $searchText, prompt: "Search books...")
             .sheet(isPresented: $showingImportSheet) {
                 ImportBooksSheet()
+                    .environmentObject(viewModel)
             }
             .refreshable {
                 await viewModel.syncProgress()
+            }
+            .alert("Error", isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            ), presenting: viewModel.errorMessage) { _ in
+                Button("OK", role: .cancel) { viewModel.errorMessage = nil }
+            } message: { message in
+                Text(message)
             }
         }
     }
@@ -185,6 +194,7 @@ struct EmptyLibraryView: View {
 }
 
 struct ImportBooksSheet: View {
+    @EnvironmentObject var viewModel: LibraryViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showingDocumentPicker = false
 
@@ -244,10 +254,14 @@ struct ImportBooksSheet: View {
             // Handle file import
             switch result {
             case .success(let urls):
-                // Process imported files
-                print("Imported files: \(urls)")
+                Task {
+                    await viewModel.importEPUBFiles(from: urls)
+                    // Close the sheet so any error surfaces in the library's alert.
+                    dismiss()
+                }
             case .failure(let error):
-                print("Import failed: \(error)")
+                viewModel.errorMessage = "Import failed: \(error.localizedDescription)"
+                dismiss()
             }
         }
     }
