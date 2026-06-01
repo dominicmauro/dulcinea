@@ -41,8 +41,9 @@ struct ViewModelTests {
 
         let sorted = sortBooks(books, by: .progress, ascending: true)
 
-        #expect(sorted[0].title == "Beta Book") // Lowest progress
-        #expect(sorted[2].title == "Gamma Book") // Highest progress
+        // Progress: Alpha 20% (ch2), Gamma 55% (ch5+0.5), Beta 89% (ch8+0.9)
+        #expect(sorted[0].title == "Alpha Book") // Lowest progress
+        #expect(sorted[2].title == "Beta Book")  // Highest progress
     }
 
     @Test func sortBooks_caseInsensitive() {
