@@ -14,7 +14,6 @@
 		F29E22332DFA58AD00A81930 /* OPDS.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E22302DFA58AD00A81930 /* OPDS.swift */; };
 		F29E22342DFA58AD00A81930 /* Sync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E22312DFA58AD00A81930 /* Sync.swift */; };
 		F29E22372DFA58BF00A81930 /* StorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E22362DFA58BF00A81930 /* StorageService.swift */; };
-		F29E223D2DFA595000A81930 /* UTType+Extensions.swift in Resources */ = {isa = PBXBuildFile; fileRef = F29E223C2DFA595000A81930 /* UTType+Extensions.swift */; };
 		F29E22442DFA5BAE00A81930 /* BrowseViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E22402DFA5BAE00A81930 /* BrowseViewModel.swift */; };
 		F29E22452DFA5BAE00A81930 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E22412DFA5BAE00A81930 /* LibraryViewModel.swift */; };
 		F29E22462DFA5BAE00A81930 /* ReaderViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E22422DFA5BAE00A81930 /* ReaderViewModel.swift */; };
@@ -338,7 +337,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F29E223D2DFA595000A81930 /* UTType+Extensions.swift in Resources */,
 				F29E22062DFA55E600A81930 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

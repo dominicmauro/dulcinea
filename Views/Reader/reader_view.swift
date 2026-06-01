@@ -689,8 +689,8 @@ struct ReaderView: View {
         }
     }
 
-    private func tocEntryRow(_ entry: TOCEntry) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+    private func tocEntryRow(_ entry: TOCEntry) -> AnyView {
+        AnyView(VStack(alignment: .leading, spacing: 0) {
             Button(action: {
                 viewModel.goToTOCEntry(entry)
             }) {
@@ -719,7 +719,7 @@ struct ReaderView: View {
             ForEach(entry.children) { child in
                 tocEntryRow(child)
             }
-        }
+        })
     }
 
     // MARK: - Gesture Handling
