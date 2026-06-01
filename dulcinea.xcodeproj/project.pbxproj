@@ -22,6 +22,7 @@
 		F29E224E2DFA63C400A81930 /* EPUBService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E224B2DFA63C400A81930 /* EPUBService.swift */; };
 		F29E224F2DFA63C400A81930 /* KOSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E224C2DFA63C400A81930 /* KOSyncService.swift */; };
 		F29E22502DFA63C400A81930 /* OPDSService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E224D2DFA63C400A81930 /* OPDSService.swift */; };
+		F2A8AF192DFA716F0079A934 /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A8AF182DFA716F0079A934 /* KeychainService.swift */; };
 		F29E22582DFA6B9100A81930 /* reader_view.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E22562DFA6B9100A81930 /* reader_view.swift */; };
 		F29E22592DFA6B9100A81930 /* browse_view.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E22552DFA6B9100A81930 /* browse_view.swift */; };
 		F29E225A2DFA6B9100A81930 /* settings_view.swift in Sources */ = {isa = PBXBuildFile; fileRef = F29E22572DFA6B9100A81930 /* settings_view.swift */; };
@@ -62,6 +63,7 @@
 		F29E224B2DFA63C400A81930 /* EPUBService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBService.swift; sourceTree = "<group>"; };
 		F29E224C2DFA63C400A81930 /* KOSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KOSyncService.swift; sourceTree = "<group>"; };
 		F29E224D2DFA63C400A81930 /* OPDSService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OPDSService.swift; sourceTree = "<group>"; };
+		F2A8AF182DFA716F0079A934 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		F29E22552DFA6B9100A81930 /* browse_view.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = browse_view.swift; sourceTree = "<group>"; };
 		F29E22562DFA6B9100A81930 /* reader_view.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = reader_view.swift; sourceTree = "<group>"; };
 		F29E22572DFA6B9100A81930 /* settings_view.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = settings_view.swift; sourceTree = "<group>"; };
@@ -157,6 +159,7 @@
 			children = (
 				F29E224B2DFA63C400A81930 /* EPUBService.swift */,
 				F29E224C2DFA63C400A81930 /* KOSyncService.swift */,
+				F2A8AF182DFA716F0079A934 /* KeychainService.swift */,
 				F29E224D2DFA63C400A81930 /* OPDSService.swift */,
 				F29E22362DFA58BF00A81930 /* StorageService.swift */,
 			);
@@ -378,6 +381,7 @@
 				F29E225C2DFA6BBA00A81930 /* library_view.swift in Sources */,
 				F29E225A2DFA6B9100A81930 /* settings_view.swift in Sources */,
 				F29E22372DFA58BF00A81930 /* StorageService.swift in Sources */,
+				F2A8AF192DFA716F0079A934 /* KeychainService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
