@@ -67,6 +67,22 @@ struct BookTests {
         #expect(book.progressPercentage == 0.0)
     }
 
+    @Test func progressPercentage_clampedToOne() {
+        // chapter/total + position/total can exceed 1.0; it must be clamped.
+        let book = Book(
+            title: "Test Book",
+            author: "Author",
+            identifier: "123",
+            filePath: "/test.epub",
+            fileSize: 1000,
+            currentChapter: 10,
+            currentPosition: 0.5,
+            totalChapters: 10
+        )
+
+        #expect(book.progressPercentage == 1.0)
+    }
+
     // MARK: - Update Progress Tests
 
     @Test func updateProgress_setsChapterAndPosition() {
