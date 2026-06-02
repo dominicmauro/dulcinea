@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import CryptoKit
 
 class KOSyncService: ObservableObject {
     @Published var status: SyncStatus = .notConfigured
@@ -33,21 +34,24 @@ class KOSyncService: ObservableObject {
 
     // MARK: - Helper Methods
 
-    /// Create a Basic Authentication header value from credentials
-    private func createAuthHeader(username: String, password: String) -> String? {
-        let credentials = "\(username):\(password)"
-        guard let credentialsData = credentials.data(using: .utf8) else {
-            return nil
-        }
-        return "Basic \(credentialsData.base64EncodedString())"
+    /// MD5 hex digest of a string (used for the KOReader auth key and document id).
+    private static func md5Hex(_ string: String) -> String {
+        let digest = Insecure.MD5.hash(data: Data(string.utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Add authentication header to a request
-    private func addAuthHeader(to request: inout URLRequest, config: SyncConfiguration) throws {
-        guard let authHeader = createAuthHeader(username: config.username, password: config.password) else {
-            throw SyncError.authenticationFailed
-        }
-        request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+    /// KOReader sync identifies a document by an MD5 hash. This uses the
+    /// "filename" matching method (MD5 of the file's name) — set KOReader's
+    /// document matching method to "Filename" for cross-device matching.
+    private static func documentHash(for book: Book) -> String {
+        let filename = URL(fileURLWithPath: book.filePath).lastPathComponent
+        return md5Hex(filename)
+    }
+
+    /// Add KOReader sync auth headers: x-auth-user and x-auth-key (MD5 of the password).
+    private func addAuthHeader(to request: inout URLRequest, config: SyncConfiguration) {
+        request.setValue(config.username, forHTTPHeaderField: "x-auth-user")
+        request.setValue(Self.md5Hex(config.password), forHTTPHeaderField: "x-auth-key")
     }
     
     // MARK: - Configuration
@@ -77,16 +81,9 @@ class KOSyncService: ObservableObject {
             throw SyncError.invalidServerURL
         }
         var request = URLRequest(url: testURL)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        let authData = [
-            "username": config.username,
-            "password": config.password
-        ]
-        
-        request.httpBody = try JSONSerialization.data(withJSONObject: authData)
-        
+        request.httpMethod = "GET"
+        addAuthHeader(to: &request, config: config)
+
         let (_, response) = try await urlSession.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -128,7 +125,7 @@ class KOSyncService: ObservableObject {
             let progressString = String(data: progressJSON, encoding: .utf8) ?? ""
             
             let syncProgress = SyncProgress(
-                document: book.identifier,
+                document: Self.documentHash(for: book),
                 progress: progressString,
                 percentage: book.progressPercentage,
                 device: config.deviceName,
@@ -154,7 +151,7 @@ class KOSyncService: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         // Add authentication
-        try addAuthHeader(to: &request, config: config)
+        addAuthHeader(to: &request, config: config)
 
         // Prepare request body
         let encoder = JSONEncoder()
@@ -192,14 +189,15 @@ class KOSyncService: ObservableObject {
             throw SyncError.configurationMissing
         }
 
-        guard let url = URL(string: "\(config.serverURL)/syncs/progress/\(book.identifier.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? book.identifier)") else {
+        let document = Self.documentHash(for: book)
+        guard let url = URL(string: "\(config.serverURL)/syncs/progress/\(document)") else {
             throw SyncError.invalidServerURL
         }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
 
         // Add authentication
-        try addAuthHeader(to: &request, config: config)
+        addAuthHeader(to: &request, config: config)
 
         let (data, response) = try await urlSession.data(for: request)
 
@@ -345,7 +343,7 @@ class KOSyncService: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         // Add authentication
-        try addAuthHeader(to: &request, config: config)
+        addAuthHeader(to: &request, config: config)
 
         let deviceInfo = [
             "device_id": config.deviceId,
@@ -378,7 +376,7 @@ class KOSyncService: ObservableObject {
         request.httpMethod = "GET"
 
         // Add authentication
-        try addAuthHeader(to: &request, config: config)
+        addAuthHeader(to: &request, config: config)
         
         let (data, response) = try await urlSession.data(for: request)
         
