@@ -230,8 +230,17 @@ class EPUBService: ObservableObject, @unchecked Sendable {
     }
     
     private func parseNavFile(at url: URL) throws -> [TOCEntry] {
-        // Simplified NAV parsing - would need more robust HTML parsing
-        return []
+        let data = try Data(contentsOf: url)
+        let parser = XMLParser(data: data)
+        let delegate = NavParserDelegate()
+        parser.delegate = delegate
+
+        guard parser.parse() else {
+            // Fall back to empty TOC if parsing fails
+            return []
+        }
+
+        return delegate.tocEntries
     }
     
     // MARK: - HTML Processing
@@ -635,6 +644,97 @@ class NCXParserDelegate: NSObject, XMLParserDelegate {
             break
         }
         
+        currentElement = ""
+        currentText = ""
+    }
+}
+
+
+/// Parses EPUB3 NAV documents (XHTML files with <nav epub:type="toc">)
+class NavParserDelegate: NSObject, XMLParserDelegate {
+    var tocEntries: [TOCEntry] = []
+    private var currentText = ""
+    private var currentElement = ""
+    private var isInTocNav = false
+    private var listDepth = 0
+    private var currentHref: String?
+    private var pendingEntries: [[TOCEntry]] = [[]]
+
+    func parser(_ parser: XMLParser, didStartElement elementName: String, namespaceURI: String?, qualifiedName qName: String?, attributes attributeDict: [String : String] = [:]) {
+        currentElement = elementName
+        currentText = ""
+
+        switch elementName {
+        case "nav":
+            // Check for epub:type="toc" (the attribute may be namespaced or not)
+            let epubType = attributeDict["epub:type"] ?? attributeDict["type"] ?? ""
+            if epubType.contains("toc") {
+                isInTocNav = true
+            }
+        case "ol":
+            if isInTocNav {
+                listDepth += 1
+                pendingEntries.append([])
+            }
+        case "a":
+            if isInTocNav {
+                currentHref = attributeDict["href"]
+            }
+        default:
+            break
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        currentText += string
+    }
+
+    func parser(_ parser: XMLParser, didEndElement elementName: String, namespaceURI: String?, qualifiedName qName: String?) {
+        let text = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        switch elementName {
+        case "nav":
+            isInTocNav = false
+        case "a":
+            if isInTocNav && !text.isEmpty {
+                // Extract chapter index from href if possible (e.g., "chapter1.xhtml" -> try to match spine order)
+                // For now, use the order they appear in the TOC (will be matched to chapters by the view model)
+                let entry = TOCEntry(
+                    title: text,
+                    chapterIndex: tocEntries.count + pendingEntries.flatMap { $0 }.count,
+                    level: listDepth,
+                    children: []
+                )
+                if pendingEntries.indices.contains(listDepth) {
+                    pendingEntries[listDepth].append(entry)
+                }
+            }
+            currentHref = nil
+        case "ol":
+            if isInTocNav && listDepth > 0 {
+                // Pop children and attach to parent if exists
+                let children = pendingEntries.removeLast()
+                listDepth -= 1
+
+                if listDepth == 0 {
+                    // Top-level entries go directly to tocEntries
+                    tocEntries.append(contentsOf: children)
+                } else if let lastIndex = pendingEntries[listDepth].indices.last {
+                    // Attach children to the last entry at the parent level
+                    var parent = pendingEntries[listDepth][lastIndex]
+                    parent = TOCEntry(
+                        title: parent.title,
+                        chapterIndex: parent.chapterIndex,
+                        level: parent.level,
+                        children: children
+                    )
+                    pendingEntries[listDepth][lastIndex] = parent
+                }
+            }
+        default:
+            break
+        }
+
         currentElement = ""
         currentText = ""
     }

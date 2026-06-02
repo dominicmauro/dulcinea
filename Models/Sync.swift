@@ -42,14 +42,14 @@ struct SyncConfiguration: Codable {
     let syncInterval: TimeInterval // in seconds
     let autoSync: Bool
 
-    init(serverURL: String, username: String, password: String, deviceName: String = UIDevice.current.name) {
+    init(serverURL: String, username: String, password: String, deviceName: String = UIDevice.current.name, syncInterval: TimeInterval = 300, autoSync: Bool = true) {
         self.serverURL = serverURL
         self.username = username
         self.password = password
         self.deviceName = deviceName
         self.deviceId = UIDevice.current.identifierForVendor?.uuidString ?? UUID().uuidString
-        self.syncInterval = 300 // 5 minutes default
-        self.autoSync = true
+        self.syncInterval = syncInterval
+        self.autoSync = autoSync
     }
 }
 
