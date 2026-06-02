@@ -23,7 +23,15 @@ class ReaderViewModel: ObservableObject {
     @Published var isMenuVisible = false
     @Published var isSettingsVisible = false
     @Published var readingProgress: Double = 0.0
-    
+
+    // Text-to-speech state
+    @Published var isSpeaking = false
+    @Published var speechRate: Float = 0.5
+
+    // Bookmarks
+    @Published var bookmarks: [Bookmark] = []
+    @Published var isBookmarksVisible = false
+
     // Pagination state
     @Published var currentPage: Int = 0
     @Published var totalPagesInChapter: Int = 1
@@ -39,7 +47,11 @@ class ReaderViewModel: ObservableObject {
     private var progressTimer: Timer?
     private var readingStartTime: Date?
     private var progressSaveTask: Task<Void, Error>?
-    
+
+    // Text-to-speech
+    private let speechSynthesizer = AVSpeechSynthesizer()
+    private var speechDelegate: SpeechDelegate?
+
     init(epubService: EPUBService, syncService: KOSyncService, storageService: StorageService) {
         self.epubService = epubService
         self.syncService = syncService
