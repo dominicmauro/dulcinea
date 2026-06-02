@@ -702,7 +702,9 @@ struct EditCatalogSheet: View {
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
             url: url.trimmingCharacters(in: .whitespacesAndNewlines),
             username: requiresAuth ? username : nil,
-            password: requiresAuth ? password : nil
+            password: requiresAuth ? password : nil,
+            isEnabled: catalog.isEnabled,
+            lastUpdated: catalog.lastUpdated
         )
         
         onSave(updatedCatalog)

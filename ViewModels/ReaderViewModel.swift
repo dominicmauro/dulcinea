@@ -23,7 +23,15 @@ class ReaderViewModel: ObservableObject {
     @Published var isMenuVisible = false
     @Published var isSettingsVisible = false
     @Published var readingProgress: Double = 0.0
-    
+
+    // Text-to-speech state
+    @Published var isSpeaking = false
+    @Published var speechRate: Float = 0.5
+
+    // Bookmarks
+    @Published var bookmarks: [Bookmark] = []
+    @Published var isBookmarksVisible = false
+
     // Pagination state
     @Published var currentPage: Int = 0
     @Published var totalPagesInChapter: Int = 1
@@ -39,7 +47,11 @@ class ReaderViewModel: ObservableObject {
     private var progressTimer: Timer?
     private var readingStartTime: Date?
     private var progressSaveTask: Task<Void, Error>?
-    
+
+    // Text-to-speech
+    private let speechSynthesizer = AVSpeechSynthesizer()
+    private var speechDelegate: SpeechDelegate?
+
     init(epubService: EPUBService, syncService: KOSyncService, storageService: StorageService) {
         self.epubService = epubService
         self.syncService = syncService
@@ -301,13 +313,9 @@ class ReaderViewModel: ObservableObject {
     }
     
     private func updateBookProgress(_ book: Book) async {
-        // This would typically go through a storage service
-        // For now, we'll emit this as a notification that can be caught by LibraryViewModel
-        NotificationCenter.default.post(
-            name: .bookProgressUpdated,
-            object: nil,
-            userInfo: ["book": book]
-        )
+        // Persist directly to storage. StorageService publishes `books`, so
+        // LibraryViewModel picks up the change automatically.
+        storageService.updateBook(book)
     }
     
     // MARK: - Reading Session Tracking
@@ -547,14 +555,14 @@ struct Bookmark: Identifiable, Codable {
     let note: String?
     let dateCreated: Date
 
-    init(bookId: UUID, chapterIndex: Int, position: Double, chapterTitle: String, note: String? = nil) {
+    init(bookId: UUID, chapterIndex: Int, position: Double, chapterTitle: String, note: String? = nil, dateCreated: Date = Date()) {
         self.id = UUID()
         self.bookId = bookId
         self.chapterIndex = chapterIndex
         self.position = position
         self.chapterTitle = chapterTitle
         self.note = note
-        self.dateCreated = Date()
+        self.dateCreated = dateCreated
     }
 }
 
@@ -566,17 +574,21 @@ enum FontFamily: String, CaseIterable {
     case sansSerif = "Helvetica"
     case monospace = "Courier"
     case dyslexic = "OpenDyslexic"
-    
+    case georgia = "Georgia"
+    case palatino = "Palatino"
+
     var displayName: String {
         switch self {
-        case .systemDefault: return "System Default"
+        case .systemDefault: return "System"
         case .serif: return "Serif"
         case .sansSerif: return "Sans Serif"
         case .monospace: return "Monospace"
         case .dyslexic: return "Dyslexic Friendly"
+        case .georgia: return "Georgia"
+        case .palatino: return "Palatino"
         }
     }
-    
+
     var fontName: String {
         switch self {
         case .systemDefault: return "system"
@@ -584,6 +596,8 @@ enum FontFamily: String, CaseIterable {
         case .sansSerif: return "Helvetica"
         case .monospace: return "Courier"
         case .dyslexic: return "OpenDyslexic-Regular"
+        case .georgia: return "Georgia"
+        case .palatino: return "Palatino"
         }
     }
 }

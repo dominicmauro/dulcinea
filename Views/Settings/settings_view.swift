@@ -1,10 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @StateObject private var viewModel = SettingsViewModel(
-        storageService: StorageService(),
-        syncService: KOSyncService()
-    )
+    @EnvironmentObject var viewModel: SettingsViewModel
     @State private var showingSyncConfig = false
     @State private var showingAbout = false
     @State private var showingExportSheet = false
@@ -336,8 +333,8 @@ struct SyncConfigurationSheet: View {
             
             Toggle("Auto Sync", isOn: $viewModel.autoSync)
                 .onChange(of: viewModel.autoSync) {
-                    if let config = viewModel.syncConfiguration {
-                        viewModel.saveSyncConfiguration(config)
+                    if viewModel.syncConfiguration != nil {
+                        viewModel.saveSyncConfiguration()
                     }
                 }
             
@@ -348,8 +345,8 @@ struct SyncConfigurationSheet: View {
                     }
                 }
                 .onChange(of: viewModel.syncInterval) {
-                    if let config = viewModel.syncConfiguration {
-                        viewModel.saveSyncConfiguration(config)
+                    if viewModel.syncConfiguration != nil {
+                        viewModel.saveSyncConfiguration()
                     }
                 }
             }
@@ -632,4 +629,8 @@ extension View {
 
 #Preview {
     SettingsView()
+        .environmentObject(SettingsViewModel(
+            storageService: StorageService(),
+            syncService: KOSyncService()
+        ))
 }
