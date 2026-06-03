@@ -414,14 +414,32 @@ struct SyncConfigurationSheet: View {
                 viewModel.password.isEmpty ||
                 viewModel.isConfiguringSyncServer
             )
-            
+
+            Button("Create Account") {
+                Task {
+                    await viewModel.createSyncAccount()
+                }
+            }
+            .disabled(
+                viewModel.serverURL.isEmpty ||
+                viewModel.username.isEmpty ||
+                viewModel.password.isEmpty ||
+                viewModel.isConfiguringSyncServer
+            )
+
             if viewModel.isConfiguringSyncServer {
                 HStack {
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text("Testing connection...")
+                    Text("Contacting server...")
                         .foregroundColor(.secondary)
                 }
+            }
+
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundColor(.red)
             }
         }
     }

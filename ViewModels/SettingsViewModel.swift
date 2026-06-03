@@ -96,14 +96,45 @@ class SettingsViewModel: ObservableObject {
         
         do {
             try await syncService.testConnection(with: testConfig)
-            
+
             // Connection successful
             saveSyncConfiguration(testConfig)
-            
+
         } catch {
             errorMessage = error.localizedDescription
         }
-        
+
+        isConfiguringSyncServer = false
+    }
+
+    func createSyncAccount() async {
+        guard !serverURL.isEmpty, !username.isEmpty, !password.isEmpty else {
+            errorMessage = "Please fill in all sync server details"
+            return
+        }
+
+        isConfiguringSyncServer = true
+        errorMessage = nil
+
+        let config = SyncConfiguration(
+            serverURL: serverURL,
+            username: username,
+            password: password,
+            deviceName: deviceName,
+            syncInterval: syncInterval.rawValue,
+            autoSync: autoSync
+        )
+
+        do {
+            try await syncService.createAccount(with: config)
+
+            // Account created — save the configuration so the user is set up.
+            saveSyncConfiguration(config)
+
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+
         isConfiguringSyncServer = false
     }
     

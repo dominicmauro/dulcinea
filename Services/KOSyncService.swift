@@ -102,7 +102,44 @@ class KOSyncService: ObservableObject {
             throw SyncError.serverError("HTTP \(httpResponse.statusCode)")
         }
     }
-    
+
+    // MARK: - Account Registration
+
+    /// Register a new user on the KOReader sync server (POST /users/create).
+    /// The password is sent MD5-hashed, matching how KOReader registers.
+    func createAccount(with config: SyncConfiguration) async throws {
+        guard let url = URL(string: "\(config.serverURL)/users/create") else {
+            throw SyncError.invalidServerURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body = ["username": config.username, "password": Self.md5Hex(config.password)]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await urlSession.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SyncError.invalidResponse
+        }
+
+        switch httpResponse.statusCode {
+        case 200, 201:
+            // Account created
+            break
+        case 402, 409:
+            // KOReader's sync server returns 402 when the username already exists
+            throw SyncError.serverError("That username is already registered.")
+        default:
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let message = errorData["message"] as? String {
+                throw SyncError.serverError(message)
+            }
+            throw SyncError.serverError("HTTP \(httpResponse.statusCode)")
+        }
+    }
+
     // MARK: - Progress Upload
     
     func uploadProgress(for book: Book) async throws {
