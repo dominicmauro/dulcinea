@@ -56,7 +56,7 @@ struct Book: Identifiable, Codable, Hashable {
         guard totalChapters > 0 else { return 0.0 }
         let chapterProgress = Double(currentChapter) / Double(totalChapters)
         let positionProgress = currentPosition / Double(totalChapters)
-        return chapterProgress + positionProgress
+        return min(1.0, chapterProgress + positionProgress)
     }
     
     var formattedFileSize: String {

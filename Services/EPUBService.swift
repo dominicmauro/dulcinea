@@ -75,6 +75,15 @@ class EPUBService: ObservableObject, @unchecked Sendable {
             for entry in archive {
                 let destinationURL = tempDir.appendingPathComponent(entry.path)
 
+                // Guard against path traversal (zip-slip): a malicious EPUB could
+                // contain entries like "../../foo" that resolve outside tempDir.
+                let standardizedRoot = tempDir.standardizedFileURL.path
+                let standardizedDest = destinationURL.standardizedFileURL.path
+                guard standardizedDest == standardizedRoot ||
+                      standardizedDest.hasPrefix(standardizedRoot + "/") else {
+                    throw EPUBError.extractionFailed
+                }
+
                 // Create intermediate directories if needed
                 let parentDir = destinationURL.deletingLastPathComponent()
                 try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
