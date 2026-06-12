@@ -70,30 +70,7 @@ class EPUBService: ObservableObject, @unchecked Sendable {
         }
 
         // Extract EPUB (it's a ZIP file)
-        do {
-            let archive = try Archive(url: url, accessMode: .read)
-            for entry in archive {
-                let destinationURL = tempDir.appendingPathComponent(entry.path)
-
-                // Guard against path traversal (zip-slip): a malicious EPUB could
-                // contain entries like "../../foo" that resolve outside tempDir.
-                let standardizedRoot = tempDir.standardizedFileURL.path
-                let standardizedDest = destinationURL.standardizedFileURL.path
-                guard standardizedDest == standardizedRoot ||
-                      standardizedDest.hasPrefix(standardizedRoot + "/") else {
-                    throw EPUBError.extractionFailed
-                }
-
-                // Create intermediate directories if needed
-                let parentDir = destinationURL.deletingLastPathComponent()
-                try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
-                
-                // Extract the entry to its full destination path
-                _ = try archive.extract(entry, to: destinationURL)
-            }
-        } catch {
-            throw EPUBError.extractionFailed
-        }
+        try extractArchive(at: url, to: tempDir)
 
         // Parse container.xml to find OPF file
         let containerPath = tempDir.appendingPathComponent("META-INF/container.xml")
@@ -143,6 +120,54 @@ class EPUBService: ObservableObject, @unchecked Sendable {
         return try? Data(contentsOf: coverURL)
     }
     
+    // MARK: - Archive Extraction
+
+    /// Extract all entries of an EPUB (ZIP) archive into a destination directory.
+    ///
+    /// Zip-slip protection is a purely lexical check (no absolute paths, no ".."
+    /// components) — path standardization is filesystem-dependent for paths that
+    /// don't exist yet, so comparing standardized paths can falsely reject
+    /// legitimate entries. Symlink entries are skipped, and duplicate entries are
+    /// ignored rather than failing the whole book.
+    private func extractArchive(at archiveURL: URL, to directory: URL) throws {
+        let archive: Archive
+        do {
+            archive = try Archive(url: archiveURL, accessMode: .read)
+        } catch {
+            print("EPUB: cannot open archive \(archiveURL.lastPathComponent): \(error)")
+            throw EPUBError.extractionFailed
+        }
+
+        for entry in archive {
+            let components = (entry.path as NSString).pathComponents
+            guard !entry.path.hasPrefix("/"), !components.contains("..") else {
+                print("EPUB: rejecting unsafe entry path: \(entry.path)")
+                throw EPUBError.extractionFailed
+            }
+
+            let destinationURL = directory.appendingPathComponent(entry.path)
+
+            do {
+                switch entry.type {
+                case .directory:
+                    try FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: true)
+                case .symlink:
+                    continue
+                case .file:
+                    let parentDir = destinationURL.deletingLastPathComponent()
+                    try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
+                    if FileManager.default.fileExists(atPath: destinationURL.path) {
+                        continue
+                    }
+                    _ = try archive.extract(entry, to: destinationURL)
+                }
+            } catch {
+                print("EPUB: failed to extract entry \(entry.path): \(error)")
+                throw EPUBError.extractionFailed
+            }
+        }
+    }
+
     // MARK: - Container Parsing
     
     private func parseContainer(at url: URL, baseURL: URL) throws -> URL {
@@ -370,13 +395,7 @@ class EPUBService: ObservableObject, @unchecked Sendable {
         
         do {
             // Extract EPUB
-            let archive = try Archive(url: fileURL, accessMode: .read)
-            for entry in archive {
-                let destinationURL = tempDir.appendingPathComponent(entry.path)
-                let parentDir = destinationURL.deletingLastPathComponent()
-                try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
-                _ = try archive.extract(entry, to: destinationURL)
-            }
+            try extractArchive(at: fileURL, to: tempDir)
             
             // Parse container and OPF to find cover
             let containerPath = tempDir.appendingPathComponent("META-INF/container.xml")
